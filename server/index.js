@@ -243,6 +243,41 @@ app.patch('/api/auth/profile-image', async (req, res) => {
   }
 })
 
+app.patch('/api/auth/password', async (req, res) => {
+  const nickname = String(req.body?.nickname || '').trim()
+  const password = String(req.body?.password || '')
+  const newPassword = String(req.body?.newPassword || '')
+
+  if (!nickname || !password || !newPassword) {
+    return res.status(400).json({ ok: false, message: 'Nickname, current password, and new password are required.' })
+  }
+  if (newPassword.length < 4) {
+    return res.status(400).json({ ok: false, message: 'New password must be at least 4 characters.' })
+  }
+  if (nickname.toLowerCase() === ADMIN_NICKNAME.toLowerCase()) {
+    return res.status(403).json({ ok: false, message: 'Admin password cannot be changed here.' })
+  }
+
+  try {
+    const user = await verifyUserPassword(nickname, password)
+    if (!user) {
+      return res.status(401).json({ ok: false, message: 'Invalid nickname or password.' })
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await pool.query(
+      `update users
+       set password_hash = $2
+       where id = $1`,
+      [user.id, passwordHash],
+    )
+
+    return res.json({ ok: true, nickname: user.nickname })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
 app.delete('/api/auth/user', async (req, res) => {
   const nickname = String(req.body?.nickname || '').trim()
   const password = String(req.body?.password || '')

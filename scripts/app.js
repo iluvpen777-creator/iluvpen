@@ -463,6 +463,25 @@ const updateUserProfileImage = async ({ nickname, password, profileImage }) => {
   return { ok: true, nickname: found, profileImage: users[found].profileImage || '' }
 }
 
+const updateUserPassword = async ({ nickname, password, newPassword }) => {
+  if (USE_REMOTE_DB) {
+    return apiRequest('/api/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ nickname, password, newPassword }),
+    })
+  }
+
+  const found = findLocalUserNickname(nickname)
+  if (!found) throw new Error('User not found.')
+  const users = getLocalUsers()
+  if (users[found]?.password !== password) {
+    throw new Error('Invalid nickname or password.')
+  }
+  users[found] = { ...users[found], password: newPassword }
+  saveLocalUsers(users)
+  return { ok: true, nickname: found }
+}
+
 const deleteUserAccount = async ({ nickname, password }) => {
   if (USE_REMOTE_DB) {
     return apiRequest('/api/auth/user', {
@@ -1375,10 +1394,15 @@ const renderHeader = () => `
               ? `<div class="account-popover">
                   ${
                     !isCurrentProtectedAdmin()
-                      ? '<button type="button" class="text-btn" data-open-account-manage="profile">Change profile photo</button><button type="button" class="text-btn danger" data-open-account-manage="delete">Delete account</button>'
+                      ? '<button type="button" class="text-btn danger" data-open-account-manage="delete">Delete account</button>'
                       : ''
                   }
                   <button type="button" class="text-btn danger" data-user-logout>Log out</button>
+                  ${
+                    !isCurrentProtectedAdmin()
+                      ? '<button type="button" class="text-btn" data-open-account-manage="settings">Settings</button>'
+                      : ''
+                  }
                 </div>`
               : ''
           }</div>`
@@ -1480,15 +1504,19 @@ const renderAuthModal = () => {
 const renderAccountManageModal = () => {
   if (!state.accountManageMode || !getNickname() || isCurrentProtectedAdmin()) return ''
 
-  if (state.accountManageMode === 'profile') {
+  if (state.accountManageMode === 'settings') {
     return `
-    <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Change profile photo">
+    <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Account settings">
       <div class="compose-sheet">
         <div class="section-head">
-          <h3>Change profile photo</h3>
+          <h3>Account settings</h3>
           <button type="button" class="icon-btn" data-close-account-manage>Close</button>
         </div>
-        <form class="comment-form" data-account-profile-form>
+        <form class="comment-form" data-account-settings-form>
+          <label>
+            Nickname (read-only)
+            <input value="${escapeHtml(getNickname())}" readonly disabled />
+          </label>
           <label>
             Image URL (optional)
             <input name="imageUrl" type="url" placeholder="https://..." />
@@ -1505,8 +1533,16 @@ const renderAccountManageModal = () => {
             Account password
             <input name="password" type="password" minlength="4" required placeholder="Enter your password" />
           </label>
+          <label>
+            New password (optional)
+            <input name="newPassword" type="password" minlength="4" placeholder="Leave empty to keep current password" />
+          </label>
+          <label>
+            Confirm new password
+            <input name="newPasswordConfirm" type="password" minlength="4" placeholder="Re-enter new password" />
+          </label>
           <div class="editor-actions">
-            <button type="submit" class="btn">Save photo</button>
+            <button type="submit" class="btn">Save settings</button>
             <button type="button" class="btn ghost" data-close-account-manage>Cancel</button>
           </div>
         </form>
@@ -1705,7 +1741,7 @@ const bindInteractions = () => {
 
     if (openAccountManage) {
       if (isCurrentProtectedAdmin()) return
-      state.accountManageMode = openAccountManage.dataset.openAccountManage === 'delete' ? 'delete' : 'profile'
+      state.accountManageMode = openAccountManage.dataset.openAccountManage === 'delete' ? 'delete' : 'settings'
       state.accountMenuOpen = false
       render()
       return
@@ -2176,7 +2212,7 @@ const bindInteractions = () => {
     const communityForm = event.target.closest('[data-community-create-form]')
     const authRegisterForm = event.target.closest('[data-auth-register]')
     const authLoginForm = event.target.closest('[data-auth-login]')
-    const accountProfileForm = event.target.closest('[data-account-profile-form]')
+    const accountSettingsForm = event.target.closest('[data-account-settings-form]')
     const accountDeleteForm = event.target.closest('[data-account-delete-form]')
         if (replyForm) {
           event.preventDefault()
@@ -2270,25 +2306,41 @@ const bindInteractions = () => {
       return
     }
 
-    if (accountProfileForm) {
+    if (accountSettingsForm) {
       event.preventDefault()
       const nickname = getNickname()
       if (!nickname || isProtectedAdminNickname(nickname)) return
 
-      const password = accountProfileForm.password.value
+      const password = accountSettingsForm.password.value
+      const newPassword = accountSettingsForm.newPassword.value
+      const newPasswordConfirm = accountSettingsForm.newPasswordConfirm.value
       const profileImage = await resolveImageInput(
-        accountProfileForm.imageUrl.value,
-        accountProfileForm.imageFile,
+        accountSettingsForm.imageUrl.value,
+        accountSettingsForm.imageFile,
       )
+
+      if (newPassword || newPasswordConfirm) {
+        if (newPassword.length < 4) {
+          alert('New password must be at least 4 characters.')
+          return
+        }
+        if (newPassword !== newPasswordConfirm) {
+          alert('New passwords do not match.')
+          return
+        }
+      }
 
       try {
         const result = await updateUserProfileImage({ nickname, password, profileImage })
+        if (newPassword) {
+          await updateUserPassword({ nickname, password, newPassword })
+        }
         state.userProfileImage = result.profileImage || ''
         state.accountManageMode = ''
-        alert('Profile photo updated.')
+        alert(newPassword ? 'Profile photo and password updated.' : 'Profile photo updated.')
         render()
       } catch (error) {
-        alert(error.message || 'Failed to update profile photo.')
+        alert(error.message || 'Failed to update account settings.')
       }
       return
     }
