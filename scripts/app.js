@@ -14,7 +14,10 @@ const STORAGE_KEYS = {
   testCommentsSeeded: 'iluvpen_test_comments_seeded',
   admin: 'iluvpen_admin_auth',
   repoConfig: 'iluvpen_repo_config',
+  resetVersion: 'iluvpen_reset_version',
 }
+
+const DATA_RESET_VERSION = '2026-07-11-clean-all-test-content'
 
 
 const state = {
@@ -401,6 +404,19 @@ const getLocalUsers = () => {
 
 const saveLocalUsers = (users) => {
   localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users))
+}
+
+const applyOneTimeDataReset = () => {
+  const applied = localStorage.getItem(STORAGE_KEYS.resetVersion)
+  if (applied === DATA_RESET_VERSION) return
+
+  localStorage.removeItem(STORAGE_KEYS.users)
+  localStorage.removeItem(STORAGE_KEYS.nickname)
+  localStorage.removeItem(STORAGE_KEYS.community)
+  localStorage.removeItem(STORAGE_KEYS.comments)
+  localStorage.removeItem(STORAGE_KEYS.testCommentsSeeded)
+  localStorage.removeItem(STORAGE_KEYS.admin)
+  localStorage.setItem(STORAGE_KEYS.resetVersion, DATA_RESET_VERSION)
 }
 
 const findLocalUserNickname = (nickname) => {
@@ -2705,6 +2721,7 @@ const bindAdminEntityPickers = () => {
 
 export const bootstrapApp = async (rootEl) => {
   if (!rootEl) return
+  applyOneTimeDataReset()
   state.lang = getPreferredLanguage()
   state.repoConfig = getSavedRepoConfig()
   applyTheme()
@@ -2758,8 +2775,6 @@ export const bootstrapApp = async (rootEl) => {
     const cachedComments = localStorage.getItem(STORAGE_KEYS.comments)
     state.comments = cachedComments ? JSON.parse(cachedComments) : commentsFromFile
   }
-
-  ensureTestCommentsSeed()
 
   bindCarousel()
   bindInteractions()
