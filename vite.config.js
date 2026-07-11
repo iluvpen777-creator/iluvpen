@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/i_luv_pen/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/iluvpen/' : '/',
   server: {
     proxy: {
       '/api': {
