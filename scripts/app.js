@@ -657,6 +657,82 @@ const resolveImageInput = async (urlValue, fileInput) => {
   return fileToDataUrl(file)
 }
 
+const getFirstImageLine = (value) =>
+  (value || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean) || ''
+
+const getFormImagePreviewSource = async (form) => {
+  if (!form) return ''
+  const fileInput = form.querySelector('input[name="imageFile"]')
+  const file = fileInput?.files?.[0]
+  if (file) {
+    if (!file.type.startsWith('image/')) return ''
+    return fileToDataUrl(file)
+  }
+
+  const urlInput = form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"]')
+  const byUrl = (urlInput?.value || '').trim()
+  if (byUrl) return byUrl
+
+  const imagesArea = form.querySelector('textarea[name="images"]')
+  if (imagesArea) {
+    return getFirstImageLine(imagesArea.value)
+  }
+
+  return ''
+}
+
+const ensureImagePreviewElement = (form) => {
+  if (!form) return null
+  const hasImageControls =
+    form.querySelector('input[name="imageFile"]') ||
+    form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"]') ||
+    form.querySelector('textarea[name="images"]')
+  if (!hasImageControls) return null
+
+  let preview = form.querySelector('[data-image-preview]')
+  if (preview) return preview
+
+  preview = document.createElement('div')
+  preview.className = 'image-preview'
+  preview.dataset.imagePreview = 'true'
+  preview.hidden = true
+  preview.innerHTML = '<p class="muted">Thumbnail preview</p><img alt="Image preview" loading="lazy" />'
+
+  const submitActions = form.querySelector('.editor-actions:last-of-type')
+  if (submitActions && submitActions.parentElement === form) {
+    form.insertBefore(preview, submitActions)
+  } else {
+    form.append(preview)
+  }
+
+  return preview
+}
+
+const syncImagePreviewForForm = async (form) => {
+  const preview = ensureImagePreviewElement(form)
+  if (!preview) return
+
+  const src = await getFormImagePreviewSource(form)
+  const image = preview.querySelector('img')
+  if (!image || !src) {
+    preview.hidden = true
+    if (image) image.removeAttribute('src')
+    return
+  }
+
+  image.src = src
+  image.onerror = () => {
+    preview.hidden = true
+    image.removeAttribute('src')
+  }
+  image.onload = () => {
+    preview.hidden = false
+  }
+}
+
 const apiRequest = async (path, options = {}) => {
   const url = `${API_BASE_URL}${path}`
   const response = await fetch(url, {
@@ -976,13 +1052,18 @@ const askAdminImageSource = (title, initialUrl = '') =>
     const fileInput = modal.querySelector('input[name="imageFile"]')
     const fileName = modal.querySelector('[data-admin-file-name]')
     const picker = modal.querySelector('[data-pick-admin-file]')
+    const adminImageForm = modal.querySelector('[data-admin-image-form]')
 
     picker.addEventListener('click', () => fileInput.click())
     fileInput.addEventListener('change', () => {
       fileName.textContent = fileInput.files?.[0]?.name || 'No file chosen'
+      syncImagePreviewForForm(adminImageForm)
+    })
+    adminImageForm.imageUrl.addEventListener('input', () => {
+      syncImagePreviewForForm(adminImageForm)
     })
 
-    modal.querySelector('[data-admin-image-form]').addEventListener('submit', async (event) => {
+    adminImageForm.addEventListener('submit', async (event) => {
       event.preventDefault()
       const form = event.currentTarget
       const image = await resolveImageInput(form.imageUrl.value, form.imageFile)
@@ -991,6 +1072,7 @@ const askAdminImageSource = (title, initialUrl = '') =>
     })
 
     document.body.append(modal)
+    syncImagePreviewForForm(adminImageForm)
   })
 
 const renderPenCarousel = (pen) => {
@@ -2720,6 +2802,7 @@ const bindInteractions = () => {
       if (fileNameEl) {
         fileNameEl.textContent = imageFileInput.files?.[0]?.name || 'No file chosen'
       }
+      syncImagePreviewForForm(imageFileInput.closest('form'))
       return
     }
 
@@ -2750,6 +2833,16 @@ const bindInteractions = () => {
   })
 
   document.addEventListener('input', (event) => {
+    const imageInput = event.target.matches(
+      'input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="images"]',
+    )
+      ? event.target
+      : null
+    if (imageInput) {
+      syncImagePreviewForForm(imageInput.closest('form'))
+      return
+    }
+
     const global = event.target.closest('[data-global-search]')
     if (!global) return
     const q = global.value.toLowerCase()
@@ -2872,6 +2965,7 @@ const bindAdminEntityPickers = () => {
       penForm.descriptionLong.value = selected.descriptionLong || ''
       penForm.images.value = (selected.images || []).join('\n')
       penForm.keywords.value = (selected.keywords || []).join(', ')
+      syncImagePreviewForForm(penForm)
     })
   }
 
@@ -2891,6 +2985,7 @@ const bindAdminEntityPickers = () => {
       blogForm.publishedAt.value = selected.publishedAt || ''
       blogForm.readingTime.value = selected.readingTime || 5
       blogForm.content.value = selected.content || ''
+      syncImagePreviewForForm(blogForm)
     })
   }
 
@@ -2909,8 +3004,13 @@ const bindAdminEntityPickers = () => {
       communityForm.likes.value = selected.likes || 0
       communityForm.createdAt.value = selected.createdAt || ''
       communityForm.pinned.checked = !!selected.pinned
+      syncImagePreviewForForm(communityForm)
     })
   }
+
+  document.querySelectorAll('form').forEach((form) => {
+    syncImagePreviewForForm(form)
+  })
 }
 
 export const bootstrapApp = async (rootEl) => {

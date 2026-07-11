@@ -261,6 +261,24 @@ main {
   display: none !important;
 }
 
+.image-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.image-preview p {
+  margin: 0;
+}
+
+.image-preview img {
+  width: min(240px, 100%);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  object-fit: cover;
+  max-height: 220px;
+}
+
 .btn,
 .icon-btn {
   border: 1px solid var(--line);
