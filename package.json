@@ -10,7 +10,8 @@
     "dev:api": "node server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "start:api": "node server/index.js",
-    "db:check": "node server/check-db.js"
+    "db:check": "node server/check-db.js",
+    "db:migrate": "node server/apply-schema.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

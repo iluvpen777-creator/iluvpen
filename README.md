@@ -100,6 +100,43 @@ GitHub Pages는 정적 호스팅이므로 DB 직접 실행이 불가능합니다
 - 페이지 접속 후 커뮤니티 글/댓글 작성
 - API의 `GET /api/db-health` 가 `ok: true` 인지 확인
 
+### Render 추천 빠른 설정 (이 프로젝트 기준)
+
+이 저장소에는 Render 블루프린트 파일 `render.yaml` 이 포함되어 있어, 클릭 몇 번으로 API + PostgreSQL을 함께 만들 수 있습니다.
+
+1) Render에서 Blueprint 배포
+
+- Render Dashboard > New > Blueprint
+- 이 GitHub 저장소(`iluvpen777-creator/iluvpen`) 선택
+- `render.yaml` 인식 후 생성되는 리소스 확인:
+	- Web Service: `iluvpen-api`
+	- PostgreSQL: `iluvpen-db`
+- Deploy 실행
+
+2) 배포 후 API 주소 확인
+
+- Render의 `iluvpen-api` 서비스 페이지에서 URL 확인
+- 예: `https://iluvpen-api.onrender.com`
+
+3) DB/헬스 체크 확인
+
+- `https://<api-url>/api/health`
+- `https://<api-url>/api/db-health`
+
+둘 다 `ok: true`면 정상입니다.
+
+4) GitHub Actions Secret 연결
+
+- GitHub 저장소 > Settings > Secrets and variables > Actions
+- `New repository secret`
+- Name: `VITE_API_BASE_URL`
+- Secret: Render에서 확인한 API URL (마지막 `/` 없이)
+
+5) 프론트 재배포
+
+- main 브랜치에 push (또는 Actions에서 수동 실행)
+- GitHub Pages 배포 후 폰/PC가 같은 DB 데이터를 보게 됩니다.
+
 ## 운영 전 필수 수정
 
 - public/robots.txt 의 YOUR_USERNAME 치환

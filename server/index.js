@@ -7,7 +7,7 @@ import { pool, testDbConnection } from './db.js'
 dotenv.config()
 
 const app = express()
-const port = Number(process.env.API_PORT || 8787)
+const port = Number(process.env.PORT || process.env.API_PORT || 8787)
 
 const corsOrigin = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((v) => v.trim())
