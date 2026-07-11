@@ -4,8 +4,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci
-    startCommand: npm run start:api
-    postDeployCommand: npm run db:migrate
+    startCommand: npm run db:migrate && npm run start:api
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
