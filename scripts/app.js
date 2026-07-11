@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   admin: 'iluvpen_admin_auth',
   repoConfig: 'iluvpen_repo_config',
   resetVersion: 'iluvpen_reset_version',
+  likeMarks: 'iluvpen_like_marks',
 }
 
 const DATA_RESET_VERSION = '2026-07-11-clean-all-test-content'
@@ -408,6 +409,58 @@ const saveLocalUsers = (users) => {
   localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users))
 }
 
+const getLikeMarks = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.likeMarks) || '{}')
+    return {
+      community: parsed?.community && typeof parsed.community === 'object' ? parsed.community : {},
+      comments: parsed?.comments && typeof parsed.comments === 'object' ? parsed.comments : {},
+    }
+  } catch {
+    return { community: {}, comments: {} }
+  }
+}
+
+const saveLikeMarks = (marks) => {
+  localStorage.setItem(STORAGE_KEYS.likeMarks, JSON.stringify(marks))
+}
+
+const getLikeBucket = (type) => {
+  const nickname = getNickname().trim().toLowerCase()
+  if (!nickname) return []
+  const marks = getLikeMarks()
+  const scope = type === 'community' ? marks.community : marks.comments
+  return Array.isArray(scope[nickname]) ? scope[nickname] : []
+}
+
+const hasLiked = (type, id) => getLikeBucket(type).includes(id)
+
+const toggleLikeMark = (type, id) => {
+  const nickname = getNickname().trim().toLowerCase()
+  if (!nickname) return false
+
+  const marks = getLikeMarks()
+  const scope = type === 'community' ? marks.community : marks.comments
+  const bucket = new Set(Array.isArray(scope[nickname]) ? scope[nickname] : [])
+
+  let nowLiked = false
+  if (bucket.has(id)) {
+    bucket.delete(id)
+  } else {
+    bucket.add(id)
+    nowLiked = true
+  }
+
+  scope[nickname] = [...bucket]
+  if (type === 'community') {
+    marks.community = scope
+  } else {
+    marks.comments = scope
+  }
+  saveLikeMarks(marks)
+  return nowLiked
+}
+
 const applyOneTimeDataReset = () => {
   const applied = localStorage.getItem(STORAGE_KEYS.resetVersion)
   if (applied === DATA_RESET_VERSION) return
@@ -416,6 +469,7 @@ const applyOneTimeDataReset = () => {
   localStorage.removeItem(STORAGE_KEYS.nickname)
   localStorage.removeItem(STORAGE_KEYS.community)
   localStorage.removeItem(STORAGE_KEYS.comments)
+  localStorage.removeItem(STORAGE_KEYS.likeMarks)
   localStorage.removeItem(STORAGE_KEYS.testCommentsSeeded)
   localStorage.removeItem(STORAGE_KEYS.admin)
   localStorage.setItem(STORAGE_KEYS.resetVersion, DATA_RESET_VERSION)
@@ -684,7 +738,9 @@ const renderCommentList = (targetId) => {
               <div class="comment-meta"><strong>${escapeHtml(comment.nickname)}</strong><span>${formatDate(comment.createdAt)}</span></div>
             </div>
             <button data-like-comment="${comment.id}" type="button" class="text-btn comment-like-btn" aria-label="Like comment">
-              <span class="comment-like-icon" aria-hidden="true">&#9825;</span>
+              <span class="comment-like-icon ${hasLiked('comments', comment.id) ? 'liked' : ''}" aria-hidden="true">${
+                hasLiked('comments', comment.id) ? '&#9829;' : '&#9825;'
+              }</span>
             </button>
           </div>
           <p class="comment-text">${renderMentionedText(comment.content)}</p>
@@ -918,6 +974,9 @@ const renderPenCarousel = (pen) => {
 
 const renderHome = () => {
   const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 3)
+  const newestCollectionPen = [...state.pens].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  )[0]
   const latestBlogs = [...state.blogs].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
@@ -933,8 +992,8 @@ const renderHome = () => {
       </div>
     </div>
     <figure class="hero-figure">
-      <img src="${state.pens[0]?.images[0] || ''}" alt="Featured fountain pen" loading="eager" />
-      <figcaption>${escapeHtml(state.pens[0]?.name || 'Featured Pen')}</figcaption>
+      <img src="${newestCollectionPen?.images?.[0] || ''}" alt="Featured fountain pen" loading="eager" />
+      <figcaption>${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</figcaption>
     </figure>
   </section>
 
@@ -1214,7 +1273,9 @@ const renderCommunityDetail = (postId) => {
       <p class="social-text">${escapeHtml(post.content)}</p>
       ${post.image ? `<img src="${escapeHtml(post.image)}" alt="Attached image" class="community-image" loading="lazy" />` : ''}
       <div class="post-actions">
-        <button type="button" class="text-btn" data-like-community="${post.id}">Likes ${post.likes}</button>
+        <button type="button" class="text-btn community-like-btn ${hasLiked('community', post.id) ? 'liked' : ''}" data-like-community="${post.id}">${
+          hasLiked('community', post.id) ? '♥' : '♡'
+        } Likes ${post.likes}</button>
         ${
           canManageOwnedContent(post.nickname)
             ? `<button type="button" class="text-btn" data-edit-community="${post.id}">Edit title/content</button><button type="button" class="text-btn danger" data-delete-community="${post.id}">Delete</button>`
@@ -1781,9 +1842,12 @@ const bindInteractions = () => {
     }
 
     if (likeCommunity) {
+      const nickname = ensureNickname()
+      if (!nickname) return
       const post = state.community.find((item) => item.id === likeCommunity.dataset.likeCommunity)
       if (!post) return
-      post.likes += 1
+      const nowLiked = toggleLikeMark('community', post.id)
+      post.likes = Math.max(0, Number(post.likes || 0) + (nowLiked ? 1 : -1))
       saveCommunity()
       render()
     }
@@ -1822,10 +1886,13 @@ const bindInteractions = () => {
     }
 
     if (likeComment) {
+      const nickname = ensureNickname()
+      if (!nickname) return
       for (const key of Object.keys(state.comments)) {
         const comment = state.comments[key].find((item) => item.id === likeComment.dataset.likeComment)
         if (comment) {
-          comment.likes += 1
+          const nowLiked = toggleLikeMark('comments', comment.id)
+          comment.likes = Math.max(0, Number(comment.likes || 0) + (nowLiked ? 1 : -1))
           saveComments()
           render()
           break

@@ -352,6 +352,10 @@ main {
   transition: transform 0.35s ease;
 }
 
+.pen-card .carousel-image {
+  aspect-ratio: 4 / 5;
+}
+
 .carousel:hover .carousel-image {
   transform: scale(1.03);
 }
@@ -799,6 +803,14 @@ select:focus {
 .comment-like-icon {
   display: inline-flex;
   transform: translateY(1px);
+}
+
+.comment-like-icon.liked {
+  color: #e03131;
+}
+
+.community-like-btn.liked {
+  color: #e03131;
 }
 
 .reply-expand {
