@@ -1,6 +1,25 @@
 const BASE_URL = import.meta.env.BASE_URL
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 const USE_REMOTE_DB = Boolean(API_BASE_URL) || Boolean(import.meta.env.DEV)
+const IS_PROD = Boolean(import.meta.env.PROD)
+const LOCAL_FALLBACK_ENABLED = !USE_REMOTE_DB
+const REMOTE_DB_REQUIRED_MESSAGE =
+  'Server DB sync is required in production. Set VITE_API_BASE_URL and redeploy.'
+let hasShownSyncWarning = false
+
+const warnRemoteDbRequired = () => {
+  if (hasShownSyncWarning) return
+  hasShownSyncWarning = true
+  alert(REMOTE_DB_REQUIRED_MESSAGE)
+}
+
+const isBlockedLocalMode = () => IS_PROD && LOCAL_FALLBACK_ENABLED
+
+const requireSyncedDbMode = () => {
+  if (!isBlockedLocalMode()) return true
+  warnRemoteDbRequired()
+  return false
+}
 const PROFILE_AVATAR_URL = new URL('../images/profile.jpg', import.meta.url).href
 const DEFAULT_USER_AVATAR =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d5d5d5"/><circle cx="32" cy="24" r="12" fill="%23f6f6f6"/><path d="M12 54c4-10 12-16 20-16s16 6 20 16" fill="%23f6f6f6"/></svg>'
@@ -493,6 +512,7 @@ const getUserProfile = async (nickname) => {
   if (USE_REMOTE_DB) {
     return apiRequest(`/api/auth/profile/${encodeURIComponent(nickname)}`)
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
   const found = findLocalUserNickname(nickname)
   if (!found) throw new Error('User not found.')
   return { ok: true, nickname: found, profileImage: getLocalUserProfileImage(found) }
@@ -505,6 +525,7 @@ const updateUserProfileImage = async ({ nickname, password, profileImage }) => {
       body: JSON.stringify({ nickname, password, profileImage }),
     })
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
 
   const found = findLocalUserNickname(nickname)
   if (!found) throw new Error('User not found.')
@@ -524,6 +545,7 @@ const updateUserPassword = async ({ nickname, password, newPassword }) => {
       body: JSON.stringify({ nickname, password, newPassword }),
     })
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
 
   const found = findLocalUserNickname(nickname)
   if (!found) throw new Error('User not found.')
@@ -543,6 +565,7 @@ const deleteUserAccount = async ({ nickname, password }) => {
       body: JSON.stringify({ nickname, password }),
     })
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
 
   const found = findLocalUserNickname(nickname)
   if (!found) throw new Error('User not found.')
@@ -566,6 +589,7 @@ const registerNickname = async (nickname, password, profileImage = '') => {
       body: JSON.stringify({ nickname, password, profileImage }),
     })
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
 
   const users = getLocalUsers()
   const exists = Object.keys(users).some((name) => name.toLowerCase() === nickname.toLowerCase())
@@ -588,6 +612,7 @@ const loginNickname = async (nickname, password) => {
       body: JSON.stringify({ nickname, password }),
     })
   }
+  if (isBlockedLocalMode()) throw new Error(REMOTE_DB_REQUIRED_MESSAGE)
 
   const foundNickname = findLocalUserNickname(nickname)
   if (!foundNickname) throw new Error('Invalid nickname or password.')
@@ -687,6 +712,10 @@ const hasRepoConfig = () => {
 }
 
 const saveComments = () => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
   if (!USE_REMOTE_DB) {
     localStorage.setItem(STORAGE_KEYS.comments, JSON.stringify(state.comments))
     return
@@ -701,6 +730,10 @@ const saveComments = () => {
 }
 
 const saveCommunity = () => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
   if (!USE_REMOTE_DB) {
     localStorage.setItem(STORAGE_KEYS.community, JSON.stringify(state.community))
     return
@@ -2731,7 +2764,7 @@ const upsertBy = (list, key, item) => {
 }
 
 const ensureTestCommentsSeed = () => {
-  if (USE_REMOTE_DB) return false
+  if (USE_REMOTE_DB || isBlockedLocalMode()) return false
   if (localStorage.getItem(STORAGE_KEYS.testCommentsSeeded) === '1') return false
 
   const targets = [
@@ -2842,6 +2875,14 @@ const bindAdminEntityPickers = () => {
 
 export const bootstrapApp = async (rootEl) => {
   if (!rootEl) return
+  if (!requireSyncedDbMode()) {
+    localStorage.removeItem(STORAGE_KEYS.nickname)
+    localStorage.removeItem(STORAGE_KEYS.users)
+    localStorage.removeItem(STORAGE_KEYS.community)
+    localStorage.removeItem(STORAGE_KEYS.comments)
+    localStorage.removeItem(STORAGE_KEYS.admin)
+    localStorage.removeItem(STORAGE_KEYS.likeMarks)
+  }
   applyOneTimeDataReset()
   state.lang = getPreferredLanguage()
   state.repoConfig = getSavedRepoConfig()
@@ -2865,7 +2906,7 @@ export const bootstrapApp = async (rootEl) => {
       const profile = await getUserProfile(currentNickname)
       state.userProfileImage = profile.profileImage || ''
     } catch {
-      state.userProfileImage = getLocalUserProfileImage(currentNickname)
+      state.userProfileImage = isBlockedLocalMode() ? '' : getLocalUserProfileImage(currentNickname)
     }
   } else {
     state.userProfileImage = ''
@@ -2886,12 +2927,16 @@ export const bootstrapApp = async (rootEl) => {
 
   if (USE_REMOTE_DB) {
     state.community = Array.isArray(apiCommunity) ? apiCommunity : []
+  } else if (isBlockedLocalMode()) {
+    state.community = Array.isArray(community) ? community : []
   } else {
     const cachedCommunity = localStorage.getItem(STORAGE_KEYS.community)
     state.community = cachedCommunity ? JSON.parse(cachedCommunity) : community
   }
   if (USE_REMOTE_DB) {
     state.comments = apiComments && typeof apiComments === 'object' && !Array.isArray(apiComments) ? apiComments : {}
+  } else if (isBlockedLocalMode()) {
+    state.comments = commentsFromFile && typeof commentsFromFile === 'object' && !Array.isArray(commentsFromFile) ? commentsFromFile : {}
   } else {
     const cachedComments = localStorage.getItem(STORAGE_KEYS.comments)
     state.comments = cachedComments ? JSON.parse(cachedComments) : commentsFromFile
