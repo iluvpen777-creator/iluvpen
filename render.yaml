@@ -2,7 +2,7 @@ services:
   - type: web
     name: iluvpen-api
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm ci
     startCommand: npm run db:migrate && npm run start:api
     healthCheckPath: /api/health
@@ -21,4 +21,4 @@ services:
 
 databases:
   - name: iluvpen-db
-    plan: starter
+    plan: free
