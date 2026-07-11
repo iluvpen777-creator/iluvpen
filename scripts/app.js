@@ -392,6 +392,8 @@ const getNickname = () => localStorage.getItem(STORAGE_KEYS.nickname) || ''
 const isProtectedAdminNickname = (nickname = '') => nickname.toLowerCase() === 'i_luv_pen'
 const isCurrentProtectedAdmin = () => isProtectedAdminNickname(getNickname())
 const getCurrentUserAvatar = () => state.userProfileImage || DEFAULT_USER_AVATAR
+const isSameNickname = (a = '', b = '') => a.trim().toLowerCase() === b.trim().toLowerCase()
+const canManageOwnedContent = (ownerNickname = '') => isAdmin() || isSameNickname(getNickname(), ownerNickname)
 
 const getLocalUsers = () => {
   try {
@@ -676,7 +678,7 @@ const renderCommentList = (targetId) => {
             <span class="comment-like-count">Likes ${comment.likes}</span>
             <button data-reply-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn">Reply</button>
             ${
-              getNickname() === comment.nickname || isAdmin()
+              canManageOwnedContent(comment.nickname)
                 ? `<button data-delete-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button>`
                 : ''
             }
@@ -1195,7 +1197,7 @@ const renderCommunityDetail = (postId) => {
       <div class="post-actions">
         <button type="button" class="text-btn" data-like-community="${post.id}">Likes ${post.likes}</button>
         ${
-          getNickname() === post.nickname || isAdmin()
+          canManageOwnedContent(post.nickname)
             ? `<button type="button" class="text-btn" data-edit-community="${post.id}">Edit title/content</button><button type="button" class="text-btn danger" data-delete-community="${post.id}">Delete</button>`
             : ''
         }
@@ -1752,7 +1754,7 @@ const bindInteractions = () => {
 
     if (deleteCommunity) {
       const post = state.community.find((item) => item.id === deleteCommunity.dataset.deleteCommunity)
-      if (!post || (post.nickname !== getNickname() && !isAdmin())) return
+      if (!post || !canManageOwnedContent(post.nickname)) return
       state.community = state.community.filter((item) => item.id !== post.id)
       saveCommunity()
       if (isAdmin() && hasRepoConfig()) {
@@ -1766,7 +1768,7 @@ const bindInteractions = () => {
 
     if (editCommunity) {
       const post = state.community.find((item) => item.id === editCommunity.dataset.editCommunity)
-      if (!post || (post.nickname !== getNickname() && !isAdmin())) return
+      if (!post || !canManageOwnedContent(post.nickname)) return
       const nextTitle = prompt('Edit title', post.title)
       if (!nextTitle) return
       const next = prompt('Edit content', post.content)
@@ -1800,7 +1802,7 @@ const bindInteractions = () => {
       const commentId = deleteComment.dataset.deleteComment
       const list = state.comments[targetId] || []
       const target = list.find((item) => item.id === commentId)
-      if (!target || (target.nickname !== getNickname() && !isAdmin())) return
+      if (!target || !canManageOwnedContent(target.nickname)) return
       state.comments[targetId] = list.filter((item) => item.id !== commentId)
       saveComments()
       if (isAdmin() && hasRepoConfig()) {
