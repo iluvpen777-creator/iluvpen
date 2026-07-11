@@ -1,0 +1,2773 @@
+const BASE_URL = import.meta.env.BASE_URL
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+const USE_REMOTE_DB = Boolean(API_BASE_URL) || Boolean(import.meta.env.DEV)
+const PROFILE_AVATAR_URL = new URL('../images/profile.jpg', import.meta.url).href
+const DEFAULT_USER_AVATAR =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d5d5d5"/><circle cx="32" cy="24" r="12" fill="%23f6f6f6"/><path d="M12 54c4-10 12-16 20-16s16 6 20 16" fill="%23f6f6f6"/></svg>'
+const STORAGE_KEYS = {
+  theme: 'iluvpen_theme',
+  lang: 'iluvpen_lang',
+  nickname: 'iluvpen_nickname',
+  users: 'iluvpen_users',
+  community: 'iluvpen_community_posts',
+  comments: 'iluvpen_comments',
+  testCommentsSeeded: 'iluvpen_test_comments_seeded',
+  admin: 'iluvpen_admin_auth',
+  repoConfig: 'iluvpen_repo_config',
+}
+
+
+const state = {
+  pens: [],
+  blogs: [],
+  community: [],
+  site: null,
+  comments: {},
+  repoConfig: {
+    owner: '',
+    repo: '',
+    branch: 'main',
+    token: '',
+  },
+  lang: 'en',
+  currentRoute: { page: 'home', param: '' },
+  accountMenuOpen: false,
+  authModalOpen: false,
+  authMode: 'login',
+  accountManageMode: '',
+  userProfileImage: '',
+}
+
+const SUPPORTED_LANGS = ['ko', 'en', 'zh', 'ja']
+
+const I18N = {
+  en: {
+    언어: 'Language',
+    '언어 선택': 'Select language',
+    '닉네임을 입력해주세요 (회원가입 없음)': 'Please enter your nickname (no sign-up required).',
+    '이미지 파일을 읽지 못했습니다.': 'Unable to read the image file.',
+    '이미지 파일만 업로드할 수 있습니다.': 'Only image files can be uploaded.',
+    '첫 댓글을 남겨주세요.': 'Be the first to leave a comment.',
+    댓글: 'Comment',
+    '댓글을 작성해주세요': 'Write your comment',
+    '이미지 URL (선택)': 'Image URL (optional)',
+    '이미지 파일 (선택)': 'Image file (optional)',
+    '댓글 등록': 'Post comment',
+    '커뮤니티 글쓰기': 'Write community post',
+    닫기: 'Close',
+    제목: 'Title',
+    내용: 'Content',
+    등록: 'Submit',
+    취소: 'Cancel',
+    '이전 이미지': 'Previous image',
+    '다음 이미지': 'Next image',
+    '이미지 ': 'Image ',
+    '컬렉션 보기': 'View collection',
+    '최신 매거진': 'Latest magazine',
+    '대표 만년필': 'Featured fountain pen',
+    '전체 보기': 'View all',
+    매거진: 'Magazine',
+    읽기: 'Read',
+    커뮤니티: 'Community',
+    검색: 'Search',
+    정렬: 'Sort',
+    최신순: 'Newest',
+    오래된순: 'Oldest',
+    이름순: 'Name',
+    출시년도순: 'Release year',
+    시리즈별: 'Series',
+    '만년필을 찾을 수 없습니다.': 'Pen not found.',
+    '컬렉션으로 돌아가기': 'Back to collection',
+    '전체화면 보기': 'Fullscreen',
+    '관련 만년필': 'Related pens',
+    '관리자 전용 작성 시스템': 'Admin-only publishing system',
+    '아티클 열기': 'Open article',
+    '포스트를 찾을 수 없습니다.': 'Post not found.',
+    '블로그로 돌아가기': 'Back to blog',
+    댓글들: 'Comments',
+    글쓰기: 'Write post',
+    인기순: 'Most liked',
+    '댓글 많은 순': 'Most commented',
+    '관리자 고정 · ': 'Pinned by admin · ',
+    좋아요: 'Likes',
+    답글: 'Reply',
+    수정: 'Edit',
+    삭제: 'Delete',
+    Home: 'Home',
+    Collection: 'Collection',
+    Blog: 'Blog',
+    Community: 'Community',
+    About: 'About',
+    Search: 'Search',
+    Admin: 'Admin',
+    '다크 모드 토글': 'Toggle dark mode',
+    'SNS 바로가기': 'Social links',
+    '내용 수정': 'Edit content',
+    '답글을 입력하세요': 'Write a reply',
+    '비밀번호가 맞지 않습니다.': 'Incorrect password.',
+    '임시저장 완료': 'Draft saved.',
+  },
+  zh: {
+    언어: '语言',
+    '언어 선택': '选择语言',
+    Home: '首页',
+    Collection: '收藏',
+    Blog: '博客',
+    Community: '社区',
+    About: '关于',
+    Search: '搜索',
+    Admin: '管理',
+    글쓰기: '发帖',
+    댓글: '评论',
+    검색: '搜索',
+    정렬: '排序',
+    최신순: '最新',
+    오래된순: '最早',
+    이름순: '名称',
+    출시년도순: '发行年份',
+    시리즈별: '系列',
+    좋아요: '点赞',
+    답글: '回复',
+    수정: '编辑',
+    삭제: '删除',
+    닫기: '关闭',
+    제목: '标题',
+    내용: '内容',
+    등록: '提交',
+    취소: '取消',
+    '이미지 URL (선택)': '图片 URL（可选）',
+    '이미지 파일 (선택)': '图片文件（可选）',
+  },
+  ja: {
+    언어: '言語',
+    '언어 선택': '言語を選択',
+    Home: 'ホーム',
+    Collection: 'コレクション',
+    Blog: 'ブログ',
+    Community: 'コミュニティ',
+    About: '概要',
+    Search: '検索',
+    Admin: '管理',
+    글쓰기: '投稿',
+    댓글: 'コメント',
+    검색: '検索',
+    정렬: '並び替え',
+    최신순: '新しい順',
+    오래된순: '古い順',
+    이름순: '名前順',
+    출시년도순: '発売年順',
+    시리즈별: 'シリーズ別',
+    좋아요: 'いいね',
+    답글: '返信',
+    수정: '編集',
+    삭제: '削除',
+    닫기: '閉じる',
+    제목: 'タイトル',
+    내용: '内容',
+    등록: '投稿',
+    취소: 'キャンセル',
+    '이미지 URL (선택)': '画像 URL（任意）',
+    '이미지 파일 (선택)': '画像ファイル（任意）',
+  },
+}
+
+const getPreferredLanguage = () => {
+  return 'en'
+}
+
+const t = (text) => {
+  if (state.lang === 'ko') return text
+  return I18N[state.lang]?.[text] || text
+}
+
+const localizeHtml = (html) => {
+  if (state.lang === 'ko') return html
+  const dict = I18N[state.lang] || {}
+  let localized = html
+  for (const [source, target] of Object.entries(dict)) {
+    localized = localized.split(source).join(target)
+  }
+  return localized
+}
+
+const getSavedRepoConfig = () => {
+  const raw = localStorage.getItem(STORAGE_KEYS.repoConfig)
+  if (!raw) return { owner: '', repo: '', branch: 'main', token: '' }
+  try {
+    const parsed = JSON.parse(raw)
+    return {
+      owner: parsed.owner || '',
+      repo: parsed.repo || '',
+      branch: parsed.branch || 'main',
+      token: parsed.token || '',
+    }
+  } catch {
+    return { owner: '', repo: '', branch: 'main', token: '' }
+  }
+}
+
+const saveRepoConfig = () => {
+  localStorage.setItem(STORAGE_KEYS.repoConfig, JSON.stringify(state.repoConfig))
+}
+
+const toBase64Utf8 = (value) => btoa(unescape(encodeURIComponent(value)))
+
+const githubRequest = async (path, options = {}) => {
+  const { owner, repo, token } = state.repoConfig
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    ...options.headers,
+  }
+
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+    ...options,
+    headers,
+  })
+
+  if (!response.ok) {
+    const reason = await response.text()
+    throw new Error(`GitHub API error: ${response.status} ${reason}`)
+  }
+
+  return response.json()
+}
+
+const ensureRepoConfig = () => {
+  const { owner, repo, branch, token } = state.repoConfig
+  if (!owner || !repo || !branch || !token) {
+    alert('Please save GitHub repository settings (owner/repo/branch/token) in Admin first.')
+    return false
+  }
+  return true
+}
+
+const commitJsonToRepo = async (filePath, data, message) => {
+  if (!ensureRepoConfig()) return false
+
+  const { branch } = state.repoConfig
+  let sha = undefined
+  try {
+    const existing = await githubRequest(`/contents/${filePath}?ref=${encodeURIComponent(branch)}`)
+    sha = existing.sha
+  } catch {
+    sha = undefined
+  }
+
+  const content = `${JSON.stringify(data, null, 2)}\n`
+
+  await githubRequest(`/contents/${filePath}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      content: toBase64Utf8(content),
+      branch,
+      sha,
+    }),
+  })
+
+  return true
+}
+
+const formatDate = (dateValue) => {
+  const d = new Date(dateValue)
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
+
+const escapeHtml = (value = '') =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+
+const renderMentionedText = (value = '') => {
+  const escaped = escapeHtml(value)
+  return escaped
+    .replace(/(^|\s)@([a-zA-Z0-9_\-.]+)/g, '$1<span class="mention">@$2</span>')
+    .replace(/\n/g, '<br />')
+}
+
+const renderUserAvatar = (nickname = '', size = 'md') => {
+  const initial = (nickname.trim().charAt(0) || '?').toUpperCase()
+  return `<span class="social-avatar ${size}" aria-hidden="true">${escapeHtml(initial)}</span>`
+}
+
+const getReplyToggleLabel = (count, expanded = false) => {
+  const safeCount = Number.isFinite(Number(count)) ? Number(count) : 0
+  return expanded ? 'Hide replies' : `View all ${safeCount} replies`
+}
+
+const markdownToHtml = (markdown = '') => {
+  const lines = markdown.split('\n')
+  const blocks = []
+  let inCode = false
+  let codeLang = ''
+  let codeBuffer = []
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    if (line.startsWith('```')) {
+      if (!inCode) {
+        inCode = true
+        codeLang = line.replace('```', '').trim()
+        codeBuffer = []
+      } else {
+        // Intentionally hide code fences in public journal rendering.
+        inCode = false
+        codeLang = ''
+      }
+      continue
+    }
+
+    if (inCode) {
+      codeBuffer.push(raw)
+      continue
+    }
+
+    if (!line) {
+      blocks.push('')
+      continue
+    }
+
+    if (line.startsWith('### ')) {
+      blocks.push(`<h3>${escapeHtml(line.slice(4))}</h3>`)
+      continue
+    }
+    if (line.startsWith('## ')) {
+      blocks.push(`<h2>${escapeHtml(line.slice(3))}</h2>`)
+      continue
+    }
+    if (line.startsWith('# ')) {
+      blocks.push(`<h1>${escapeHtml(line.slice(2))}</h1>`)
+      continue
+    }
+    if (line.startsWith('- ')) {
+      const prev = blocks[blocks.length - 1]
+      if (!prev || !prev.endsWith('</ul>')) {
+        blocks.push('<ul>')
+      }
+      blocks.push(`<li>${escapeHtml(line.slice(2))}</li>`)
+      continue
+    }
+    blocks.push(`<p>${escapeHtml(line)}</p>`)
+  }
+
+  // normalize list wrappers
+  const normalized = []
+  let listOpen = false
+  for (const block of blocks) {
+    if (block === '<ul>') {
+      if (!listOpen) {
+        normalized.push('<ul>')
+        listOpen = true
+      }
+      continue
+    }
+    if (block.startsWith('<li>')) {
+      normalized.push(block)
+      continue
+    }
+    if (listOpen) {
+      normalized.push('</ul>')
+      listOpen = false
+    }
+    if (block) {
+      normalized.push(block)
+    }
+  }
+  if (listOpen) normalized.push('</ul>')
+
+  return normalized.join('')
+}
+
+const getNickname = () => localStorage.getItem(STORAGE_KEYS.nickname) || ''
+const isProtectedAdminNickname = (nickname = '') => nickname.toLowerCase() === 'i_luv_pen'
+const isCurrentProtectedAdmin = () => isProtectedAdminNickname(getNickname())
+const getCurrentUserAvatar = () => state.userProfileImage || DEFAULT_USER_AVATAR
+
+const getLocalUsers = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.users) || '{}')
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const saveLocalUsers = (users) => {
+  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users))
+}
+
+const findLocalUserNickname = (nickname) => {
+  const users = getLocalUsers()
+  const key = Object.keys(users).find((name) => name.toLowerCase() === nickname.toLowerCase())
+  return key || ''
+}
+
+const getLocalUserProfileImage = (nickname) => {
+  const found = findLocalUserNickname(nickname)
+  if (!found) return ''
+  const users = getLocalUsers()
+  return users[found]?.profileImage || ''
+}
+
+const getUserProfile = async (nickname) => {
+  if (!nickname) return { nickname: '', profileImage: '' }
+  if (USE_REMOTE_DB) {
+    return apiRequest(`/api/auth/profile/${encodeURIComponent(nickname)}`)
+  }
+  const found = findLocalUserNickname(nickname)
+  if (!found) throw new Error('User not found.')
+  return { ok: true, nickname: found, profileImage: getLocalUserProfileImage(found) }
+}
+
+const updateUserProfileImage = async ({ nickname, password, profileImage }) => {
+  if (USE_REMOTE_DB) {
+    return apiRequest('/api/auth/profile-image', {
+      method: 'PATCH',
+      body: JSON.stringify({ nickname, password, profileImage }),
+    })
+  }
+
+  const found = findLocalUserNickname(nickname)
+  if (!found) throw new Error('User not found.')
+  const users = getLocalUsers()
+  if (users[found]?.password !== password) {
+    throw new Error('Invalid nickname or password.')
+  }
+  users[found] = { ...users[found], profileImage: profileImage || '' }
+  saveLocalUsers(users)
+  return { ok: true, nickname: found, profileImage: users[found].profileImage || '' }
+}
+
+const deleteUserAccount = async ({ nickname, password }) => {
+  if (USE_REMOTE_DB) {
+    return apiRequest('/api/auth/user', {
+      method: 'DELETE',
+      body: JSON.stringify({ nickname, password }),
+    })
+  }
+
+  const found = findLocalUserNickname(nickname)
+  if (!found) throw new Error('User not found.')
+  const users = getLocalUsers()
+  if (users[found]?.password !== password) {
+    throw new Error('Invalid nickname or password.')
+  }
+  delete users[found]
+  saveLocalUsers(users)
+  return { ok: true }
+}
+
+const registerNickname = async (nickname, password, profileImage = '') => {
+  if (isProtectedAdminNickname(nickname)) {
+    throw new Error('This nickname is reserved.')
+  }
+
+  if (USE_REMOTE_DB) {
+    return apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ nickname, password, profileImage }),
+    })
+  }
+
+  const users = getLocalUsers()
+  const exists = Object.keys(users).some((name) => name.toLowerCase() === nickname.toLowerCase())
+  if (exists) {
+    throw new Error('Nickname already exists.')
+  }
+  users[nickname] = { password, profileImage: profileImage || '' }
+  saveLocalUsers(users)
+  return { ok: true, nickname, profileImage: users[nickname].profileImage }
+}
+
+const loginNickname = async (nickname, password) => {
+  if (isProtectedAdminNickname(nickname) && password === 'iluvpen-admin') {
+    return { ok: true, nickname: 'i_luv_pen', profileImage: '' }
+  }
+
+  if (USE_REMOTE_DB) {
+    return apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ nickname, password }),
+    })
+  }
+
+  const foundNickname = findLocalUserNickname(nickname)
+  if (!foundNickname) throw new Error('Invalid nickname or password.')
+  const users = getLocalUsers()
+  if (users[foundNickname]?.password !== password) {
+    throw new Error('Invalid nickname or password.')
+  }
+  return {
+    ok: true,
+    nickname: foundNickname,
+    profileImage: users[foundNickname]?.profileImage || '',
+  }
+}
+
+const ensureNickname = () => {
+  const current = getNickname()
+  if (current) return current
+  state.authModalOpen = true
+  state.authMode = 'login'
+  render()
+  return ''
+}
+
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(new Error('Unable to read the image file.'))
+    reader.readAsDataURL(file)
+  })
+
+const resolveImageInput = async (urlValue, fileInput) => {
+  const byUrl = (urlValue || '').trim()
+  if (byUrl) return byUrl
+
+  const file = fileInput?.files?.[0]
+  if (!file) return ''
+  if (!file.type.startsWith('image/')) {
+    alert('Only image files can be uploaded.')
+    return ''
+  }
+  return fileToDataUrl(file)
+}
+
+const apiRequest = async (path, options = {}) => {
+  const url = `${API_BASE_URL}${path}`
+  const response = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+  })
+
+  if (!response.ok) {
+    const reason = await response.text()
+    throw new Error(`API error: ${response.status} ${reason}`)
+  }
+
+  if (response.status === 204) return null
+  return response.json()
+}
+
+const loadJson = async (path) => {
+  const res = await fetch(`${BASE_URL}${path}`)
+  if (!res.ok) throw new Error(`Failed to load ${path}`)
+  return res.json()
+}
+
+const parseHashRoute = () => {
+  const value = location.hash.replace(/^#\/?/, '')
+  if (!value) return { page: 'home', param: '' }
+  const [page, ...rest] = value.split('/')
+  return { page, param: rest.join('/') }
+}
+
+const applyTheme = () => {
+  const saved = localStorage.getItem(STORAGE_KEYS.theme)
+  const shouldDark = saved
+    ? saved === 'dark'
+    : window.matchMedia('(prefers-color-scheme: dark)').matches
+  document.documentElement.dataset.theme = shouldDark ? 'dark' : 'light'
+}
+
+const toggleTheme = () => {
+  const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+  const next = current === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = next
+  localStorage.setItem(STORAGE_KEYS.theme, next)
+}
+
+const getComments = (targetId) => state.comments[targetId] || []
+const isAdmin = () => {
+  const adminFlag = localStorage.getItem(STORAGE_KEYS.admin) === 'true'
+  return adminFlag && isCurrentProtectedAdmin()
+}
+const hasRepoConfig = () => {
+  const { owner, repo, branch, token } = state.repoConfig
+  return Boolean(owner && repo && branch && token)
+}
+
+const saveComments = () => {
+  if (!USE_REMOTE_DB) {
+    localStorage.setItem(STORAGE_KEYS.comments, JSON.stringify(state.comments))
+    return
+  }
+  apiRequest('/api/state/comments-map', {
+    method: 'PUT',
+    body: JSON.stringify({ comments: state.comments }),
+  }).catch((error) => {
+    console.error('Failed to save comments to DB:', error)
+    alert('Failed to save comments to DB. Please check API/DB status.')
+  })
+}
+
+const saveCommunity = () => {
+  if (!USE_REMOTE_DB) {
+    localStorage.setItem(STORAGE_KEYS.community, JSON.stringify(state.community))
+    return
+  }
+  apiRequest('/api/state/community', {
+    method: 'PUT',
+    body: JSON.stringify({ community: state.community }),
+  }).catch((error) => {
+    console.error('Failed to save community to DB:', error)
+    alert('Failed to save community to DB. Please check API/DB status.')
+  })
+}
+
+const getSortedCommunity = (sort) => {
+  const arr = [...state.community]
+  if (sort === 'popular') return arr.sort((a, b) => b.likes - a.likes)
+  if (sort === 'comments') {
+    return arr.sort(
+      (a, b) => getComments(`community:${b.id}`).length - getComments(`community:${a.id}`).length,
+    )
+  }
+  return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+}
+
+const renderCommentList = (targetId) => {
+  const comments = getComments(targetId)
+  if (!comments.length) return '<p class="muted">Be the first to leave a comment.</p>'
+
+  return `<ul class="comment-list">${comments
+    .map(
+      (comment) => `<li class="comment-item">
+          <div class="comment-head">
+            <div class="comment-head-main">
+              ${renderUserAvatar(comment.nickname, 'sm')}
+              <div class="comment-meta"><strong>${escapeHtml(comment.nickname)}</strong><span>${formatDate(comment.createdAt)}</span></div>
+            </div>
+            <button data-like-comment="${comment.id}" type="button" class="text-btn comment-like-btn" aria-label="Like comment">
+              <span class="comment-like-icon" aria-hidden="true">&#9825;</span>
+            </button>
+          </div>
+          <p class="comment-text">${renderMentionedText(comment.content)}</p>
+          ${
+            comment.image
+              ? `<img src="${escapeHtml(comment.image)}" alt="Attached image" class="comment-image" loading="lazy" />`
+              : ''
+          }
+          <div class="comment-actions">
+            <span class="comment-like-count">Likes ${comment.likes}</span>
+            <button data-reply-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn">Reply</button>
+            ${
+              getNickname() === comment.nickname || isAdmin()
+                ? `<button data-delete-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button>`
+                : ''
+            }
+          </div>
+          <form class="comment-form reply-form" data-reply-form="${targetId}:${comment.id}">
+            <label>
+              Write a reply
+              <textarea name="reply" rows="2" required placeholder="Use @nickname to mention someone"></textarea>
+            </label>
+            <button type="submit" class="btn ghost">Post reply</button>
+          </form>
+          ${
+            comment.replies?.length
+              ? `<button type="button" class="text-btn reply-expand" data-toggle-replies="${targetId}:${comment.id}" data-reply-count="${comment.replies.length}">${getReplyToggleLabel(comment.replies.length, false)}</button>
+              <ul class="reply-list" data-replies-list="${targetId}:${comment.id}" hidden>${comment.replies
+                  .map(
+                    (reply) => `<li>
+                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs')}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div></div>
+                      <p class="comment-text">${renderMentionedText(reply.content)}</p>
+                    </li>`,
+                  )
+                  .join('')}</ul>`
+              : ''
+          }
+        </li>`,
+    )
+    .join('')}</ul>`
+}
+
+const renderCommentComposer = (targetId) => `
+  <form class="comment-form comment-composer" data-comment-form="${targetId}">
+    <textarea name="comment" rows="2" required placeholder="Write a comment"></textarea>
+    <div class="composer-actions">
+      <button type="button" class="btn ghost" data-toggle-image-fields>Add image</button>
+      <button type="submit" class="btn">Post</button>
+    </div>
+    <div class="image-fields" data-image-fields hidden>
+      <label>
+        Image URL (optional)
+        <input name="imageUrl" type="url" placeholder="https://..." />
+      </label>
+      <label>
+        Image file (optional)
+        <input name="imageFile" type="file" accept="image/*" hidden />
+        <div class="editor-actions file-picker">
+          <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+          <span class="muted" data-file-name>No file chosen</span>
+        </div>
+      </label>
+    </div>
+  </form>
+`
+
+const renderCommunityComposer = () => `
+  <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Write community post">
+    <div class="compose-sheet">
+      <div class="section-head">
+        <h3>Write community post</h3>
+        <button type="button" class="icon-btn" data-close-compose>Close</button>
+      </div>
+      <form class="comment-form" data-community-create-form>
+        <label>
+          Title
+          <input name="title" required maxlength="120" />
+        </label>
+        <label>
+          Content
+          <textarea name="content" rows="5" required></textarea>
+        </label>
+        <button type="button" class="btn ghost" data-toggle-image-fields>Add image</button>
+        <div class="image-fields" data-image-fields hidden>
+          <label>
+            Image URL (optional)
+            <input name="imageUrl" type="url" placeholder="https://..." />
+          </label>
+          <label>
+            Image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
+        </div>
+        <div class="editor-actions">
+          <button type="submit" class="btn">Submit</button>
+          <button type="button" class="btn ghost" data-close-compose>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+`
+
+const askAdminFields = (title, fields) =>
+  new Promise((resolve) => {
+    const modal = document.createElement('div')
+    modal.className = 'compose-modal'
+    modal.innerHTML = `
+      <div class="compose-sheet">
+        <div class="section-head">
+          <h3>${escapeHtml(title)}</h3>
+          <button type="button" class="icon-btn" data-close-admin-modal>Close</button>
+        </div>
+        <form class="comment-form" data-admin-modal-form>
+          ${fields
+            .map(
+              (field) => `<label>
+                ${escapeHtml(field.label)}
+                ${
+                  field.multiline
+                    ? `<textarea name="${escapeHtml(field.name)}" rows="${field.rows || 4}" required>${escapeHtml(field.value || '')}</textarea>`
+                    : `<input name="${escapeHtml(field.name)}" value="${escapeHtml(field.value || '')}" required />`
+                }
+              </label>`,
+            )
+            .join('')}
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save</button>
+            <button type="button" class="btn ghost" data-close-admin-modal>Cancel</button>
+          </div>
+        </form>
+      </div>
+    `
+
+    const close = (value = null) => {
+      modal.remove()
+      resolve(value)
+    }
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.closest('[data-close-admin-modal]')) {
+        close(null)
+      }
+    })
+
+    modal.querySelector('[data-admin-modal-form]').addEventListener('submit', (event) => {
+      event.preventDefault()
+      const data = Object.fromEntries(new FormData(event.currentTarget).entries())
+      close(data)
+    })
+
+    document.body.append(modal)
+  })
+
+const askAdminImageSource = (title, initialUrl = '') =>
+  new Promise((resolve) => {
+    const modal = document.createElement('div')
+    modal.className = 'compose-modal'
+    modal.innerHTML = `
+      <div class="compose-sheet">
+        <div class="section-head">
+          <h3>${escapeHtml(title)}</h3>
+          <button type="button" class="icon-btn" data-close-admin-image-modal>Close</button>
+        </div>
+        <form class="comment-form" data-admin-image-form>
+          <label>
+            Image URL (optional)
+            <input name="imageUrl" type="url" value="${escapeHtml(initialUrl)}" placeholder="https://..." />
+          </label>
+          <label>
+            Image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions">
+              <button type="button" class="btn ghost" data-pick-admin-file>Choose file</button>
+              <span class="muted" data-admin-file-name>No file chosen</span>
+            </div>
+          </label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save</button>
+            <button type="button" class="btn ghost" data-close-admin-image-modal>Cancel</button>
+          </div>
+        </form>
+      </div>
+    `
+
+    const close = (value = null) => {
+      modal.remove()
+      resolve(value)
+    }
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.closest('[data-close-admin-image-modal]')) {
+        close(null)
+      }
+    })
+
+    const fileInput = modal.querySelector('input[name="imageFile"]')
+    const fileName = modal.querySelector('[data-admin-file-name]')
+    const picker = modal.querySelector('[data-pick-admin-file]')
+
+    picker.addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', () => {
+      fileName.textContent = fileInput.files?.[0]?.name || 'No file chosen'
+    })
+
+    modal.querySelector('[data-admin-image-form]').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const form = event.currentTarget
+      const image = await resolveImageInput(form.imageUrl.value, form.imageFile)
+      if (!image) return
+      close(image)
+    })
+
+    document.body.append(modal)
+  })
+
+const renderPenCarousel = (pen) => {
+  return `
+  <div class="carousel" data-carousel-id="${pen.id}">
+    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">‹</button>
+    <img src="${pen.images[0]}" alt="${escapeHtml(pen.name)}" class="carousel-image" loading="lazy" data-carousel-image="${pen.id}" />
+    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">›</button>
+    <div class="dots">${pen.images
+      .map((_, idx) => `<button type="button" class="dot ${idx === 0 ? 'active' : ''}" data-carousel-dot="${pen.id}:${idx}" aria-label="Image ${idx + 1}"></button>`)
+      .join('')}</div>
+  </div>`
+}
+
+const renderHome = () => {
+  const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 3)
+  const latestBlogs = [...state.blogs].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3)
+  const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
+
+  return `
+  <section class="hero reveal">
+    <div>
+      <p class="eyebrow">Premium Archive</p>
+      <h1>i_luv_pen</h1>
+      <p class="lead">collection, news, community by james koh</p>
+      <div class="hero-actions">
+        <a class="btn" href="#/collection">View Collection</a>
+        <a class="btn ghost" href="#/news">Latest News</a>
+      </div>
+    </div>
+    <figure class="hero-figure">
+      <img src="${state.pens[0]?.images[0] || ''}" alt="Featured fountain pen" loading="eager" />
+      <figcaption>${escapeHtml(state.pens[0]?.name || 'Featured Pen')}</figcaption>
+    </figure>
+  </section>
+
+  <section class="section reveal">
+    <div class="section-head"><h2>Latest Collection</h2><a href="#/collection">View all</a></div>
+    <div class="grid cards-3">${latestPens
+      .map(
+        (pen) => `<article class="card pen-card" data-open-pen="${pen.id}">
+        ${renderPenCarousel(pen)}
+        <div class="card-body">
+          <h3>${escapeHtml(pen.name)}</h3>
+          <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+          <p>${escapeHtml(pen.description)}</p>
+        </div>
+      </article>`,
+      )
+      .join('')}</div>
+  </section>
+
+  <section class="section reveal">
+    <div class="section-head"><h2>Latest News</h2><a href="#/news">News</a></div>
+    <div class="grid cards-3">${latestBlogs
+      .map(
+        (post) => `<article class="card blog-card">
+          <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
+          <div class="card-body">
+            <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
+            <h3>${escapeHtml(post.title)}</h3>
+            <p>${escapeHtml(post.subtitle)}</p>
+            <a class="text-link" href="#/news/${post.slug}">Read</a>
+          </div>
+        </article>`,
+      )
+      .join('')}</div>
+  </section>
+
+  <section class="section reveal">
+    <div class="section-head"><h2>Community Highlights</h2><a href="#/community">Community</a></div>
+    <div class="list">${hotCommunity
+      .map(
+        (post) => `<article class="list-item">
+          <h3>${escapeHtml(post.title)}</h3>
+          <p>${escapeHtml(post.content.slice(0, 130))}...</p>
+          <p class="meta">${escapeHtml(post.nickname)} · Likes ${post.likes} · Comments ${getComments(`community:${post.id}`).length}</p>
+        </article>`,
+      )
+      .join('')}</div>
+  </section>
+  `
+}
+
+const renderCollection = (params) => {
+  const search = (params.get('q') || '').toLowerCase()
+  const sort = params.get('sort') || 'latest'
+
+  let filtered = [...state.pens].filter((pen) => {
+    if (!search) return true
+    const target = [pen.name, pen.series, String(pen.year), ...(pen.keywords || [])].join(' ').toLowerCase()
+    return target.includes(search)
+  })
+
+  if (sort === 'oldest') filtered.sort((a, b) => a.year - b.year)
+  if (sort === 'name') filtered.sort((a, b) => a.name.localeCompare(b.name))
+  if (sort === 'year') filtered.sort((a, b) => b.year - a.year)
+  if (sort === 'series') filtered.sort((a, b) => a.series.localeCompare(b.series))
+  if (sort === 'latest') filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  return `
+  <section class="section reveal">
+    <div class="section-head">
+      <h2>Collection Archive</h2>
+      <p class="muted">Total ${filtered.length}</p>
+    </div>
+    <form class="filter-bar" data-collection-filter>
+      <label>
+        Search
+        <input type="search" name="q" value="${escapeHtml(search)}" placeholder="Name, series, year, keyword" />
+      </label>
+      <label>
+        Sort
+        <select name="sort">
+          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest</option>
+          <option value="oldest" ${sort === 'oldest' ? 'selected' : ''}>Oldest</option>
+          <option value="name" ${sort === 'name' ? 'selected' : ''}>Name</option>
+          <option value="year" ${sort === 'year' ? 'selected' : ''}>Release year</option>
+          <option value="series" ${sort === 'series' ? 'selected' : ''}>Series</option>
+        </select>
+      </label>
+    </form>
+    <div class="grid cards-3">${filtered
+      .map(
+        (pen) => `<article class="card pen-card" data-open-pen="${pen.id}">
+          ${renderPenCarousel(pen)}
+          <div class="card-body">
+            <h3>${escapeHtml(pen.name)}</h3>
+            <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            <p>${escapeHtml(pen.description)}</p>
+            ${
+              isAdmin()
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
+                : ''
+            }
+          </div>
+        </article>`,
+      )
+      .join('')}</div>
+  </section>`
+}
+
+const renderPenDetail = (id) => {
+  const pen = state.pens.find((item) => item.id === id)
+  if (!pen) return '<section class="section"><h2>Pen not found.</h2></section>'
+
+  const related = state.pens.filter((item) => item.id !== pen.id && item.series === pen.series).slice(0, 3)
+
+  return `
+    <section class="section reveal">
+      <a href="#/collection" class="text-link">← Back to Collection</a>
+      <div class="detail-layout">
+        <div>
+          ${renderPenCarousel(pen)}
+          <button type="button" class="btn ghost" data-open-lightbox="${pen.id}">Open fullscreen</button>
+        </div>
+        <article class="detail-panel">
+          <h2>${escapeHtml(pen.name)}</h2>
+          <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+          <p class="muted">${escapeHtml(pen.description || '')}</p>
+          ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
+          <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
+          ${
+            isAdmin()
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
+          <ul class="admin-photo-list">${pen.images
+            .map(
+              (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></li>`,
+            )
+            .join('')}</ul>`
+              : ''
+          }
+        </article>
+      </div>
+    </section>
+    <section class="section reveal">
+      <h2>Related Pens</h2>
+      <div class="grid cards-3">${related
+        .map(
+          (item) => `<article class="card" data-open-pen="${item.id}">
+            <img src="${item.images[0]}" alt="${escapeHtml(item.name)}" loading="lazy" />
+            <div class="card-body"><h3>${escapeHtml(item.name)}</h3><p class="meta">${item.year}</p></div>
+          </article>`,
+        )
+        .join('')}</div>
+    </section>
+  `
+}
+
+const renderBlogList = () => {
+  const posts = [...state.blogs].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+  return `
+  <section class="section reveal">
+    <div class="section-head"><h2>News</h2><p class="muted">Admin-managed publishing system</p>${isAdmin() ? '<a href="#/admin" class="btn ghost">Add</a>' : ''}</div>
+    <div class="grid cards-2">${posts
+      .map(
+        (post) => `<article class="card blog-card">
+          <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
+          <div class="card-body">
+            <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
+            <h3>${escapeHtml(post.title)}</h3>
+            <p>${escapeHtml(post.subtitle)}</p>
+            <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
+            <a href="#/news/${post.slug}" class="text-link">Open article</a>
+            ${
+              isAdmin()
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-blog-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-blog-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-blog-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-blog-inline="${post.slug}">Delete</button></div>`
+                : ''
+            }
+          </div>
+        </article>`,
+      )
+      .join('')}</div>
+  </section>`
+}
+
+const renderBlogDetail = (slug) => {
+  const post = state.blogs.find((item) => item.slug === slug)
+  if (!post) return '<section class="section"><h2>Post not found.</h2></section>'
+
+  const related = state.blogs.filter((item) => item.slug !== slug && item.category === post.category).slice(0, 2)
+
+  return `
+  <section class="section reveal">
+    <a href="#/news" class="text-link">← Back to News</a>
+    <article class="article">
+      <p class="eyebrow">${escapeHtml(post.category)}</p>
+      <h1>${escapeHtml(post.title)}</h1>
+      <p class="lead">${escapeHtml(post.subtitle)}</p>
+      <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min read</p>
+      <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" class="article-cover" />
+      <div class="article-content">${markdownToHtml(post.content)}</div>
+      <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
+      ${
+        isAdmin()
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-blog-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-blog-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-blog-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-blog-inline="${post.slug}">Delete</button></div>`
+          : ''
+      }
+    </article>
+  </section>
+  <section class="section reveal">
+    <h2>Related Articles</h2>
+    <div class="grid cards-2">${related
+      .map(
+        (item) => `<article class="card"><div class="card-body"><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.subtitle)}</p><a href="#/news/${item.slug}" class="text-link">Read</a></div></article>`,
+      )
+      .join('')}</div>
+  </section>
+  <section class="section reveal">
+    <h2>Comments</h2>
+    ${renderCommentList(`news:${post.slug}`)}
+    ${renderCommentComposer(`news:${post.slug}`)}
+  </section>`
+}
+
+const renderCommunityBoard = (params) => {
+  const sort = params.get('sort') || 'latest'
+  const posts = getSortedCommunity(sort)
+
+  return `
+  <section class="section reveal">
+    <div class="section-head">
+      <h2>Community</h2>
+      <button type="button" class="btn" data-create-community>Write post</button>
+    </div>
+    <form class="filter-bar" data-community-sort>
+      <label>
+        Sort
+        <select name="sort">
+          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest</option>
+          <option value="popular" ${sort === 'popular' ? 'selected' : ''}>Most liked</option>
+          <option value="comments" ${sort === 'comments' ? 'selected' : ''}>Most commented</option>
+        </select>
+      </label>
+    </form>
+    <div class="board-list">${posts
+      .map(
+        (post) => `<a class="board-row ${post.pinned ? 'pinned' : ''}" href="#/community/${post.id}">
+          <span class="board-title-wrap">
+            ${
+              post.image
+                ? `<img src="${escapeHtml(post.image)}" alt="Post thumbnail" class="board-thumb" loading="lazy" />`
+                : ''
+            }
+            <span class="board-title">${escapeHtml(post.title)} <em class="board-count">[${getComments(`community:${post.id}`).length}]</em></span>
+          </span>
+          <span class="board-author">${escapeHtml(post.nickname)}</span>
+          <span class="board-time">${formatDate(post.createdAt)}</span>
+        </a>`,
+      )
+      .join('')}</div>
+  </section>`
+}
+
+const renderCommunityDetail = (postId) => {
+  const post = state.community.find((item) => item.id === postId)
+  if (!post) {
+    return '<section class="section"><h2>Post not found.</h2><a href="#/community" class="text-link">← Back to Community</a></section>'
+  }
+
+  return `
+  <section class="section reveal">
+    <a href="#/community" class="text-link">← Back to Community</a>
+    <article class="list-item social-post ${post.pinned ? 'pinned' : ''}" data-community-id="${post.id}">
+      <div class="social-head">
+        ${renderUserAvatar(post.nickname, 'md')}
+        <div class="social-meta"><strong>${escapeHtml(post.nickname)}</strong><span>${post.pinned ? 'Pinned by admin · ' : ''}${formatDate(post.createdAt)}</span></div>
+      </div>
+      <h3 class="social-title">${escapeHtml(post.title)}</h3>
+      <p class="social-text">${escapeHtml(post.content)}</p>
+      ${post.image ? `<img src="${escapeHtml(post.image)}" alt="Attached image" class="community-image" loading="lazy" />` : ''}
+      <div class="post-actions">
+        <button type="button" class="text-btn" data-like-community="${post.id}">Likes ${post.likes}</button>
+        ${
+          getNickname() === post.nickname || isAdmin()
+            ? `<button type="button" class="text-btn" data-edit-community="${post.id}">Edit title/content</button><button type="button" class="text-btn danger" data-delete-community="${post.id}">Delete</button>`
+            : ''
+        }
+        ${
+          isAdmin()
+            ? `<button type="button" class="text-btn" data-admin-toggle-pin-community="${post.id}">${post.pinned ? 'Unpin' : 'Pin'}</button>`
+            : ''
+        }
+      </div>
+      <div class="comment-block">
+        <h4>Comments ${getComments(`community:${post.id}`).length}</h4>
+        ${renderCommentList(`community:${post.id}`)}
+        ${renderCommentComposer(`community:${post.id}`)}
+      </div>
+    </article>
+  </section>`
+}
+
+const renderCommunity = (params, postId = '') => {
+  if (postId) return renderCommunityDetail(postId)
+  return renderCommunityBoard(params)
+}
+
+const renderSearch = () => {
+  return `
+  <section class="section reveal">
+    <h2>Search Archive</h2>
+    <label>
+      Live search
+      <input type="search" data-global-search placeholder="Name, series, year, keyword" />
+    </label>
+    <div id="search-results" class="list"></div>
+  </section>
+  `
+}
+
+const renderAbout = () => `
+  <section class="section reveal">
+    <h2>About i_luv_pen</h2>
+    <p class="lead">i_luv_pen preserves and expands premium fountain pen culture through a carefully curated digital archive.</p>
+    <div class="grid cards-2">
+      <article class="card"><div class="card-body"><h3>Archive</h3><p>JSON-driven architecture designed to scale to thousands of pen entries.</p></div></article>
+      <article class="card"><div class="card-body"><h3>News</h3><p>Long-form markdown articles with code blocks, captions, categories, and tags.</p></div></article>
+      <article class="card"><div class="card-body"><h3>Community</h3><p>Nickname-based participation without mandatory sign-up.</p></div></article>
+      <article class="card"><div class="card-body"><h3>Open & Free</h3><p>Near-zero-cost hosting via GitHub Pages and GitHub Actions.</p></div></article>
+    </div>
+  </section>
+`
+
+const renderAdmin = () => {
+  const authed = isAdmin()
+  if (!authed) {
+    return `
+      <section class="section reveal">
+        <h2>Admin Login</h2>
+        <p class="muted">Static sites cannot fully protect secrets. For production, move to GitHub App or OIDC-based authentication.</p>
+        <form class="admin-login" data-admin-login>
+          <label>Admin nickname<input name="nickname" required placeholder="i_luv_pen" /></label>
+          <label>Admin password<input name="password" type="password" required /></label>
+          <button class="btn" type="submit">Sign in</button>
+        </form>
+      </section>
+    `
+  }
+
+  return `
+  <section class="section reveal">
+    <div class="section-head"><h2>Admin Panel</h2><button type="button" class="btn ghost" data-admin-logout>Sign out</button></div>
+
+    <div class="grid cards-2">
+      <article class="card"><div class="card-body">
+        <h3>Collection Management (data/pens.json)</h3>
+        <form class="admin-editor" data-admin-pens>
+          <label>Select existing ID
+            <select name="pick"><option value="">New item</option>${state.pens.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.id)}</option>`).join('')}</select>
+          </label>
+          <label>ID<input name="id" required /></label>
+          <label>Name<input name="name" required /></label>
+          <label>Series<input name="series" required /></label>
+          <label>Release year<input name="year" type="number" required /></label>
+          <label>Description<textarea name="description" rows="2" required></textarea></label>
+          <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
+          <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
+          <label>Keywords (comma-separated)<input name="keywords" /></label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Add/Update + Commit</button>
+            <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Commit</button>
+          </div>
+        </form>
+      </div></article>
+
+      <article class="card"><div class="card-body">
+        <h3>News Management (data/blog.json)</h3>
+        <form class="admin-editor" data-admin-blogs>
+          <label>Select existing slug
+            <select name="pick"><option value="">New post</option>${state.blogs.map((b) => `<option value="${escapeHtml(b.slug)}">${escapeHtml(b.slug)}</option>`).join('')}</select>
+          </label>
+          <label>Slug<input name="slug" required /></label>
+          <label>Title<input name="title" required /></label>
+          <label>Subtitle<input name="subtitle" required /></label>
+          <label>Category<input name="category" required /></label>
+          <label>Tags (comma-separated)<input name="tags" /></label>
+          <label>Cover image URL<input name="coverImage" type="url" required /></label>
+          <label>Published at (ISO)<input name="publishedAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
+          <label>Reading time (minutes)<input name="readingTime" type="number" min="1" value="5" /></label>
+          <label>Content (Markdown)<textarea name="content" rows="6" required></textarea></label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Add/Update + Commit</button>
+            <button type="button" class="btn ghost" data-admin-delete-blog>Delete + Commit</button>
+          </div>
+        </form>
+      </div></article>
+
+      <article class="card"><div class="card-body">
+        <h3>Community Management (data/community.json)</h3>
+        <form class="admin-editor" data-admin-community>
+          <label>Select existing ID
+            <select name="pick"><option value="">New post</option>${state.community.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.id)}</option>`).join('')}</select>
+          </label>
+          <label>ID<input name="id" required /></label>
+          <label>Nickname<input name="nickname" required /></label>
+          <label>Title<input name="title" required /></label>
+          <label>Content<textarea name="content" rows="4" required></textarea></label>
+          <label>Image URL<input name="image" type="url" /></label>
+          <label>Likes<input name="likes" type="number" value="0" /></label>
+          <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
+          <label><input name="pinned" type="checkbox" /> Pin by admin</label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Add/Update + Commit</button>
+            <button type="button" class="btn ghost" data-admin-delete-community>Delete + Commit</button>
+          </div>
+        </form>
+      </div></article>
+
+      <article class="card"><div class="card-body">
+        <h3>Comment Management (data/comments.json)</h3>
+        <form class="admin-editor" data-admin-comments>
+          <label>Target ID (e.g. news:slug, community:id)<input name="targetId" required /></label>
+          <label>Comment ID<input name="id" required /></label>
+          <label>Nickname<input name="nickname" required /></label>
+          <label>Content<textarea name="content" rows="3" required></textarea></label>
+          <label>Image URL<input name="image" type="url" /></label>
+          <label>Likes<input name="likes" type="number" value="0" /></label>
+          <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Add/Update + Commit</button>
+            <button type="button" class="btn ghost" data-admin-delete-comment>Delete + Commit</button>
+          </div>
+        </form>
+      </div></article>
+    </div>
+  </section>
+  `
+}
+
+const renderHeader = () => `
+<header class="site-header">
+  <a href="#/home" class="brand" aria-label="i_luv_pen home">
+    <img class="brand-avatar" src="${PROFILE_AVATAR_URL}" alt="i_luv_pen profile" />
+    <span>i_luv_pen</span>
+  </a>
+  <nav aria-label="Main menu">
+    <a href="#/home">Home</a>
+    <a href="#/collection">Collection</a>
+    <a href="#/news">News</a>
+    <a href="#/community">Community</a>
+    <a href="#/about">About</a>
+    <a href="#/search">Search</a>
+  </nav>
+  <div class="header-controls">
+    ${
+      getNickname()
+        ? `<div class="account-menu"><button type="button" class="btn ghost account-trigger" data-toggle-account-menu><img class="account-avatar" src="${escapeHtml(getCurrentUserAvatar())}" alt="${escapeHtml(getNickname())} profile" /><span>${escapeHtml(getNickname())}</span></button>${
+            state.accountMenuOpen
+              ? `<div class="account-popover">
+                  ${
+                    !isCurrentProtectedAdmin()
+                      ? '<button type="button" class="text-btn" data-open-account-manage="profile">Change profile photo</button><button type="button" class="text-btn danger" data-open-account-manage="delete">Delete account</button>'
+                      : ''
+                  }
+                  <button type="button" class="text-btn danger" data-user-logout>Log out</button>
+                </div>`
+              : ''
+          }</div>`
+        : '<button type="button" class="btn ghost" data-pick-nickname>Create account</button>'
+    }
+    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">◐</button>
+  </div>
+</header>
+`
+
+const renderQuickLinks = () => `
+<section class="quick-links" aria-label="Social links">
+  <a href="https://www.instagram.com/i_luv_pen/" target="_blank" rel="noreferrer">instagram</a>
+  <a href="https://www.instagram.com/i_luv_pen_highartistry/" target="_blank" rel="noreferrer">instagram ( highartistry )</a>
+  <a href="https://www.threads.com/@i_luv_pen" target="_blank" rel="noreferrer">threads</a>
+  <a href="https://m.youtube.com/@i_luv_pen" target="_blank" rel="noreferrer">youtube</a>
+</section>
+`
+
+const renderFooter = () => `
+<footer class="site-footer">
+  <p>© ${new Date().getFullYear()} i_luv_pen. Premium Fountain Pen Archive.</p>
+  ${isAdmin() ? '<a href="#/admin">Admin</a>' : ''}
+</footer>
+`
+
+const renderAuthModal = () => {
+  if (!state.authModalOpen) return ''
+
+  if (state.authMode === 'register') {
+    return `
+    <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Create nickname account">
+      <div class="compose-sheet">
+        <div class="section-head">
+          <h3>Create nickname account</h3>
+          <button type="button" class="icon-btn" data-close-auth-modal>Close</button>
+        </div>
+        <form class="comment-form" data-auth-register>
+          <label>
+            Nickname
+            <input name="nickname" maxlength="24" required placeholder="Your nickname" />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" minlength="4" required placeholder="At least 4 characters" />
+          </label>
+          <label>
+            Confirm password
+            <input name="passwordConfirm" type="password" minlength="4" required placeholder="Re-enter password" />
+          </label>
+          <label>
+            Profile image URL (optional)
+            <input name="imageUrl" type="url" placeholder="https://..." />
+          </label>
+          <label>
+            Profile image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Create account</button>
+            <button type="button" class="btn ghost" data-switch-auth-mode="login">Go to login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    `
+  }
+
+  return `
+  <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Login">
+    <div class="compose-sheet">
+      <div class="section-head">
+        <h3>Login</h3>
+        <button type="button" class="icon-btn" data-close-auth-modal>Close</button>
+      </div>
+      <form class="comment-form" data-auth-login>
+        <label>
+          Nickname
+          <input name="nickname" maxlength="24" required placeholder="Your nickname" />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" minlength="4" required placeholder="Your password" />
+        </label>
+        <div class="editor-actions">
+          <button type="submit" class="btn">Login</button>
+          <button type="button" class="btn ghost" data-switch-auth-mode="register">Create account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  `
+}
+
+const renderAccountManageModal = () => {
+  if (!state.accountManageMode || !getNickname() || isCurrentProtectedAdmin()) return ''
+
+  if (state.accountManageMode === 'profile') {
+    return `
+    <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Change profile photo">
+      <div class="compose-sheet">
+        <div class="section-head">
+          <h3>Change profile photo</h3>
+          <button type="button" class="icon-btn" data-close-account-manage>Close</button>
+        </div>
+        <form class="comment-form" data-account-profile-form>
+          <label>
+            Image URL (optional)
+            <input name="imageUrl" type="url" placeholder="https://..." />
+          </label>
+          <label>
+            Image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
+          <label>
+            Account password
+            <input name="password" type="password" minlength="4" required placeholder="Enter your password" />
+          </label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save photo</button>
+            <button type="button" class="btn ghost" data-close-account-manage>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    `
+  }
+
+  return `
+  <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Delete account">
+    <div class="compose-sheet">
+      <div class="section-head">
+        <h3>Delete account</h3>
+        <button type="button" class="icon-btn" data-close-account-manage>Close</button>
+      </div>
+      <form class="comment-form" data-account-delete-form>
+        <p class="muted">This action deletes your account and logs you out.</p>
+        <label>
+          Type DELETE to confirm
+          <input name="confirm" required placeholder="DELETE" />
+        </label>
+        <label>
+          Account password
+          <input name="password" type="password" minlength="4" required placeholder="Enter your password" />
+        </label>
+        <div class="editor-actions">
+          <button type="submit" class="btn ghost">Delete account</button>
+          <button type="button" class="btn" data-close-account-manage>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  `
+}
+
+const renderLayout = () => {
+  const app = document.querySelector('#app')
+  const params = new URLSearchParams(location.search)
+
+  let pageHtml = ''
+  if (state.currentRoute.page === 'home') pageHtml = renderHome()
+  if (state.currentRoute.page === 'collection') pageHtml = renderCollection(params)
+  if (state.currentRoute.page === 'pen') pageHtml = renderPenDetail(state.currentRoute.param)
+  if (state.currentRoute.page === 'news' && !state.currentRoute.param) pageHtml = renderBlogList()
+  if (state.currentRoute.page === 'news' && state.currentRoute.param) pageHtml = renderBlogDetail(state.currentRoute.param)
+  if (state.currentRoute.page === 'community') pageHtml = renderCommunity(params, state.currentRoute.param)
+  if (state.currentRoute.page === 'about') pageHtml = renderAbout()
+  if (state.currentRoute.page === 'search') pageHtml = renderSearch()
+  if (state.currentRoute.page === 'admin') pageHtml = renderAdmin()
+  if (!pageHtml) pageHtml = renderHome()
+
+  app.innerHTML = localizeHtml(`
+    <div class="shell page-enter">
+      ${renderHeader()}
+      ${renderQuickLinks()}
+      <main id="main-content">${pageHtml}</main>
+      ${renderFooter()}
+    </div>
+    ${renderAuthModal()}
+    ${renderAccountManageModal()}
+  `)
+}
+
+const bindCarousel = () => {
+  const indexes = new Map()
+  const update = (id, nextIndex) => {
+    const pen = state.pens.find((item) => item.id === id)
+    if (!pen) return
+    const safe = ((nextIndex % pen.images.length) + pen.images.length) % pen.images.length
+    indexes.set(id, safe)
+
+    const img = document.querySelector(`[data-carousel-image="${id}"]`)
+    if (img) img.src = pen.images[safe]
+
+    document.querySelectorAll(`[data-carousel-dot^="${id}:"]`).forEach((dot, idx) => {
+      dot.classList.toggle('active', idx === safe)
+    })
+  }
+
+  document.addEventListener('click', (event) => {
+    const prev = event.target.closest('[data-carousel-prev]')
+    const next = event.target.closest('[data-carousel-next]')
+    const dot = event.target.closest('[data-carousel-dot]')
+
+    if (prev) {
+      const id = prev.dataset.carouselPrev
+      update(id, (indexes.get(id) || 0) - 1)
+    }
+    if (next) {
+      const id = next.dataset.carouselNext
+      update(id, (indexes.get(id) || 0) + 1)
+    }
+    if (dot) {
+      const [id, idx] = dot.dataset.carouselDot.split(':')
+      update(id, Number(idx))
+    }
+  })
+}
+
+const bindInteractions = () => {
+  document.addEventListener('click', (event) => {
+    const openPen = event.target.closest('[data-open-pen]')
+    const createPost = event.target.closest('[data-create-community]')
+    const likeCommunity = event.target.closest('[data-like-community]')
+    const deleteCommunity = event.target.closest('[data-delete-community]')
+    const editCommunity = event.target.closest('[data-edit-community]')
+    const likeComment = event.target.closest('[data-like-comment]')
+    const deleteComment = event.target.closest('[data-delete-comment]')
+    const replyComment = event.target.closest('[data-reply-comment]')
+    const toggleReplies = event.target.closest('[data-toggle-replies]')
+    const toggleThemeBtn = event.target.closest('[data-toggle-theme]')
+    const openLightbox = event.target.closest('[data-open-lightbox]')
+    const adminPreview = event.target.closest('[data-admin-preview]')
+    const adminLogout = event.target.closest('[data-admin-logout]')
+    const closeCompose = event.target.closest('[data-close-compose]')
+    const deletePen = event.target.closest('[data-admin-delete-pen]')
+    const deleteBlog = event.target.closest('[data-admin-delete-blog]')
+    const deleteCommunityByAdmin = event.target.closest('[data-admin-delete-community]')
+    const deleteCommentByAdmin = event.target.closest('[data-admin-delete-comment]')
+    const deletePenInline = event.target.closest('[data-admin-delete-pen-inline]')
+    const deleteBlogInline = event.target.closest('[data-admin-delete-blog-inline]')
+    const editPenTitleInline = event.target.closest('[data-admin-edit-pen-title-inline]')
+    const editPenTextInline = event.target.closest('[data-admin-edit-pen-text-inline]')
+    const editBlogTitleInline = event.target.closest('[data-admin-edit-blog-title-inline]')
+    const editBlogTextInline = event.target.closest('[data-admin-edit-blog-text-inline]')
+    const editBlogCoverInline = event.target.closest('[data-admin-edit-blog-cover-inline]')
+    const addPenImage = event.target.closest('[data-admin-add-pen-image]')
+    const deletePenImage = event.target.closest('[data-admin-delete-pen-image]')
+    const adminOpen = event.target.closest('[data-admin-open]')
+    const toggleCommunityPin = event.target.closest('[data-admin-toggle-pin-community]')
+    const pickFile = event.target.closest('[data-pick-file]')
+    const toggleImageFields = event.target.closest('[data-toggle-image-fields]')
+    const toggleAccountMenu = event.target.closest('[data-toggle-account-menu]')
+    const userLogout = event.target.closest('[data-user-logout]')
+    const pickNickname = event.target.closest('[data-pick-nickname]')
+    const closeAuthModal = event.target.closest('[data-close-auth-modal]')
+    const switchAuthMode = event.target.closest('[data-switch-auth-mode]')
+    const openAccountManage = event.target.closest('[data-open-account-manage]')
+    const closeAccountManage = event.target.closest('[data-close-account-manage]')
+
+    if (state.accountMenuOpen && !event.target.closest('.account-menu')) {
+      state.accountMenuOpen = false
+      render()
+      return
+    }
+
+    if (toggleThemeBtn) toggleTheme()
+
+    const clickedAdminControl = event.target.closest(
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-edit-blog-title-inline],[data-admin-edit-blog-text-inline],[data-admin-edit-blog-cover-inline],[data-admin-delete-blog-inline]',
+    )
+
+    if (openPen && !clickedAdminControl) {
+      location.hash = `#/pen/${openPen.dataset.openPen}`
+    }
+
+    if (adminOpen) {
+      location.hash = adminOpen.dataset.adminOpen
+    }
+
+    if (toggleAccountMenu) {
+      state.accountMenuOpen = !state.accountMenuOpen
+      render()
+      return
+    }
+
+    if (userLogout) {
+      localStorage.removeItem(STORAGE_KEYS.nickname)
+      localStorage.removeItem(STORAGE_KEYS.admin)
+      state.accountMenuOpen = false
+      state.accountManageMode = ''
+      state.userProfileImage = ''
+      render()
+      return
+    }
+
+    if (pickNickname) {
+      state.authMode = 'register'
+      state.authModalOpen = true
+      state.accountMenuOpen = false
+      render()
+      return
+    }
+
+    if (closeAuthModal) {
+      state.authModalOpen = false
+      render()
+      return
+    }
+
+    if (switchAuthMode) {
+      state.authMode = switchAuthMode.dataset.switchAuthMode === 'register' ? 'register' : 'login'
+      render()
+      return
+    }
+
+    if (openAccountManage) {
+      if (isCurrentProtectedAdmin()) return
+      state.accountManageMode = openAccountManage.dataset.openAccountManage === 'delete' ? 'delete' : 'profile'
+      state.accountMenuOpen = false
+      render()
+      return
+    }
+
+    if (closeAccountManage) {
+      state.accountManageMode = ''
+      render()
+      return
+    }
+
+    if (createPost) {
+      const nickname = ensureNickname()
+      if (!nickname) return
+      if (document.querySelector('.compose-modal')) return
+      document.body.insertAdjacentHTML('beforeend', renderCommunityComposer())
+    }
+
+    if (pickFile) {
+      const container = pickFile.closest('label') || pickFile.closest('form')
+      const input = container?.querySelector('input[name="imageFile"]')
+      input?.click()
+      return
+    }
+
+    if (toggleImageFields) {
+      const form = toggleImageFields.closest('form')
+      const fields = form?.querySelector('[data-image-fields]')
+      if (!fields) return
+      fields.hidden = !fields.hidden
+      toggleImageFields.textContent = fields.hidden ? 'Add image' : 'Hide image inputs'
+      return
+    }
+
+    if (closeCompose) {
+      closeCompose.closest('.compose-modal')?.remove()
+    }
+
+    if (likeCommunity) {
+      const post = state.community.find((item) => item.id === likeCommunity.dataset.likeCommunity)
+      if (!post) return
+      post.likes += 1
+      saveCommunity()
+      render()
+    }
+
+    if (deleteCommunity) {
+      const post = state.community.find((item) => item.id === deleteCommunity.dataset.deleteCommunity)
+      if (!post || (post.nickname !== getNickname() && !isAdmin())) return
+      state.community = state.community.filter((item) => item.id !== post.id)
+      saveCommunity()
+      if (isAdmin() && hasRepoConfig()) {
+        commitJsonToRepo('data/community.json', state.community, `admin: delete community ${post.id}`)
+          .then(() => render())
+          .catch((err) => alert(err.message))
+        return
+      }
+      render()
+    }
+
+    if (editCommunity) {
+      const post = state.community.find((item) => item.id === editCommunity.dataset.editCommunity)
+      if (!post || (post.nickname !== getNickname() && !isAdmin())) return
+      const nextTitle = prompt('Edit title', post.title)
+      if (!nextTitle) return
+      const next = prompt('Edit content', post.content)
+      if (!next) return
+      post.title = nextTitle
+      post.content = next
+      saveCommunity()
+      if (isAdmin() && hasRepoConfig()) {
+        commitJsonToRepo('data/community.json', state.community, `admin: edit community ${post.id}`)
+          .then(() => render())
+          .catch((err) => alert(err.message))
+        return
+      }
+      render()
+    }
+
+    if (likeComment) {
+      for (const key of Object.keys(state.comments)) {
+        const comment = state.comments[key].find((item) => item.id === likeComment.dataset.likeComment)
+        if (comment) {
+          comment.likes += 1
+          saveComments()
+          render()
+          break
+        }
+      }
+    }
+
+    if (deleteComment) {
+      const targetId = deleteComment.dataset.targetId
+      const commentId = deleteComment.dataset.deleteComment
+      const list = state.comments[targetId] || []
+      const target = list.find((item) => item.id === commentId)
+      if (!target || (target.nickname !== getNickname() && !isAdmin())) return
+      state.comments[targetId] = list.filter((item) => item.id !== commentId)
+      saveComments()
+      if (isAdmin() && hasRepoConfig()) {
+        commitJsonToRepo('data/comments.json', state.comments, `admin: delete comment ${targetId}/${commentId}`)
+          .then(() => render())
+          .catch((err) => alert(err.message))
+        return
+      }
+      render()
+    }
+
+    if (replyComment) {
+      const targetId = replyComment.dataset.targetId
+      const commentId = replyComment.dataset.replyComment
+      const form = document.querySelector(`[data-reply-form="${targetId}:${commentId}"]`)
+      if (!form) return
+      form.classList.add('open')
+      const textarea = form.querySelector('textarea[name="reply"]')
+      if (textarea) {
+        textarea.focus()
+      }
+    }
+
+    if (toggleReplies) {
+      const key = toggleReplies.dataset.toggleReplies
+      const count = Number(toggleReplies.dataset.replyCount || 0)
+      const parentComment = toggleReplies.closest('.comment-item')
+      const nearbyList =
+        toggleReplies.nextElementSibling?.matches('[data-replies-list]')
+          ? toggleReplies.nextElementSibling
+          : null
+      const list = parentComment?.querySelector(`[data-replies-list="${key}"]`) || nearbyList
+      if (!list) return
+      list.hidden = !list.hidden
+      toggleReplies.textContent = getReplyToggleLabel(count || list.querySelectorAll('li').length, !list.hidden)
+    }
+
+    if (openLightbox) {
+      const pen = state.pens.find((item) => item.id === openLightbox.dataset.openLightbox)
+      if (!pen) return
+      const modal = document.createElement('div')
+      modal.className = 'lightbox'
+      modal.innerHTML = `<div class="lightbox-inner"><button class="icon-btn" data-close-lightbox>Close</button><img src="${pen.images[0]}" alt="${escapeHtml(pen.name)}" /></div>`
+      document.body.append(modal)
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.closest('[data-close-lightbox]')) {
+          modal.remove()
+        }
+      })
+    }
+
+    if (adminPreview) {
+      const form = document.querySelector('[data-admin-editor]')
+      if (!form) return
+      const title = form.title.value
+      const summary = form.summary.value
+      const content = form.content.value
+      const target = document.querySelector('#admin-preview')
+      target.innerHTML = `<div class="card-body"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(summary)}</p><div class="article-content">${markdownToHtml(content)}</div></div>`
+    }
+
+    if (adminLogout) {
+      localStorage.removeItem(STORAGE_KEYS.admin)
+      render()
+    }
+
+    if (deletePen) {
+      const form = deletePen.closest('[data-admin-pens]')
+      const id = form?.id?.value?.trim()
+      if (!id) return
+      state.pens = state.pens.filter((p) => p.id !== id)
+      commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen ${id}`)
+        .then((ok) => {
+          if (ok) {
+            alert('Collection item deleted and committed.')
+            render()
+          }
+        })
+        .catch((err) => alert(err.message))
+    }
+
+    if (deleteBlog) {
+      const form = deleteBlog.closest('[data-admin-blogs]')
+      const slug = form?.slug?.value?.trim()
+      if (!slug) return
+      state.blogs = state.blogs.filter((b) => b.slug !== slug)
+      commitJsonToRepo('data/blog.json', state.blogs, `admin: delete blog ${slug}`)
+        .then((ok) => {
+          if (ok) {
+            alert('Blog post deleted and committed.')
+            render()
+          }
+        })
+        .catch((err) => alert(err.message))
+    }
+
+    if (deleteCommunityByAdmin) {
+      const form = deleteCommunityByAdmin.closest('[data-admin-community]')
+      const id = form?.id?.value?.trim()
+      if (!id) return
+      state.community = state.community.filter((c) => c.id !== id)
+      saveCommunity()
+      commitJsonToRepo('data/community.json', state.community, `admin: delete community ${id}`)
+        .then((ok) => {
+          if (ok) {
+            alert('Community post deleted and committed.')
+            render()
+          }
+        })
+        .catch((err) => alert(err.message))
+    }
+
+    if (deletePenInline) {
+      if (!isAdmin()) return
+      const id = deletePenInline.dataset.adminDeletePenInline
+      state.pens = state.pens.filter((p) => p.id !== id)
+      if (hasRepoConfig()) {
+        commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen ${id}`)
+          .then(() => {
+            alert('Collection item deleted.')
+            location.hash = '#/collection'
+            render()
+          })
+          .catch((err) => alert(err.message))
+      } else {
+        alert('Repository not configured: deleted in runtime state only.')
+        location.hash = '#/collection'
+        render()
+      }
+    }
+
+    if (deleteBlogInline) {
+      if (!isAdmin()) return
+      const slug = deleteBlogInline.dataset.adminDeleteBlogInline
+      state.blogs = state.blogs.filter((b) => b.slug !== slug)
+      if (hasRepoConfig()) {
+        commitJsonToRepo('data/blog.json', state.blogs, `admin: delete blog ${slug}`)
+          .then(() => {
+            alert('Blog post deleted.')
+            location.hash = '#/news'
+            render()
+          })
+          .catch((err) => alert(err.message))
+      } else {
+        alert('Repository not configured: deleted in runtime state only.')
+        location.hash = '#/news'
+        render()
+      }
+    }
+
+    if (editPenTitleInline) {
+      if (!isAdmin()) return
+      const id = editPenTitleInline.dataset.adminEditPenTitleInline
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminFields('Edit pen title', [{ name: 'name', label: 'Title', value: pen.name }]).then((values) => {
+        if (!values?.name) return
+        pen.name = values.name.trim()
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/pens.json', state.pens, `admin: edit pen title ${id}`)
+            .then(() => {
+              alert('Pen title updated and committed.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: updated in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (editPenTextInline) {
+      if (!isAdmin()) return
+      const id = editPenTextInline.dataset.adminEditPenTextInline
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminFields('Edit pen text', [
+        { name: 'description', label: 'Short description', value: pen.description || '', multiline: true, rows: 3 },
+        {
+          name: 'descriptionLong',
+          label: 'Long description',
+          value: pen.descriptionLong || pen.description || '',
+          multiline: true,
+          rows: 5,
+        },
+      ]).then((values) => {
+        if (!values) return
+        pen.description = (values.description || '').trim()
+        pen.descriptionLong = (values.descriptionLong || '').trim()
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/pens.json', state.pens, `admin: edit pen text ${id}`)
+            .then(() => {
+              alert('Pen text updated and committed.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: updated in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (editBlogTitleInline) {
+      if (!isAdmin()) return
+      const slug = editBlogTitleInline.dataset.adminEditBlogTitleInline
+      const post = state.blogs.find((b) => b.slug === slug)
+      if (!post) return
+      askAdminFields('Edit news title', [
+        { name: 'title', label: 'Title', value: post.title || '' },
+        { name: 'subtitle', label: 'Subtitle', value: post.subtitle || '' },
+      ]).then((values) => {
+        if (!values) return
+        post.title = (values.title || '').trim()
+        post.subtitle = (values.subtitle || '').trim()
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit news title ${slug}`)
+            .then(() => {
+              alert('News title/subtitle updated and committed.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: updated in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (editBlogTextInline) {
+      if (!isAdmin()) return
+      const slug = editBlogTextInline.dataset.adminEditBlogTextInline
+      const post = state.blogs.find((b) => b.slug === slug)
+      if (!post) return
+      askAdminFields('Edit news text', [
+        { name: 'content', label: 'Content (Markdown)', value: post.content || '', multiline: true, rows: 10 },
+      ]).then((values) => {
+        if (!values?.content) return
+        post.content = values.content
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit news text ${slug}`)
+            .then(() => {
+              alert('News text updated and committed.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: updated in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (editBlogCoverInline) {
+      if (!isAdmin()) return
+      const slug = editBlogCoverInline.dataset.adminEditBlogCoverInline
+      const post = state.blogs.find((b) => b.slug === slug)
+      if (!post) return
+      askAdminImageSource('Edit cover photo', post.coverImage || '').then((image) => {
+        if (!image) return
+        post.coverImage = image.trim()
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit blog cover ${slug}`)
+            .then(() => {
+              alert('Blog cover photo updated and committed.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: updated in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (addPenImage) {
+      if (!isAdmin()) return
+      const id = addPenImage.dataset.adminAddPenImage
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminImageSource('Add photo').then((image) => {
+        if (!image) return
+        pen.images ||= []
+        pen.images.push(image)
+        if (hasRepoConfig()) {
+          commitJsonToRepo('data/pens.json', state.pens, `admin: add pen image ${id}`)
+            .then(() => {
+              alert('Photo added.')
+              render()
+            })
+            .catch((err) => alert(err.message))
+        } else {
+          alert('Repository not configured: added in runtime state only.')
+          render()
+        }
+      })
+      return
+    }
+
+    if (deletePenImage) {
+      if (!isAdmin()) return
+      const [id, idxRaw] = deletePenImage.dataset.adminDeletePenImage.split(':')
+      const idx = Number(idxRaw)
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen || !pen.images?.[idx]) return
+      if (pen.images.length <= 1) {
+        alert('At least one image must remain.')
+        return
+      }
+      pen.images.splice(idx, 1)
+      if (hasRepoConfig()) {
+        commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen image ${id}:${idx}`)
+          .then(() => {
+            alert('Photo deleted.')
+            render()
+          })
+          .catch((err) => alert(err.message))
+      } else {
+        alert('Repository not configured: deleted in runtime state only.')
+        render()
+      }
+    }
+
+    if (toggleCommunityPin) {
+      if (!isAdmin()) return
+      const id = toggleCommunityPin.dataset.adminTogglePinCommunity
+      const post = state.community.find((c) => c.id === id)
+      if (!post) return
+      post.pinned = !post.pinned
+      saveCommunity()
+      if (hasRepoConfig()) {
+        commitJsonToRepo('data/community.json', state.community, `admin: toggle pin community ${id}`)
+          .then(() => {
+            alert('Community pin state updated and committed.')
+            render()
+          })
+          .catch((err) => alert(err.message))
+      } else {
+        alert('Repository not configured: updated in runtime state only.')
+        render()
+      }
+    }
+
+    if (deleteCommentByAdmin) {
+      const form = deleteCommentByAdmin.closest('[data-admin-comments]')
+      const targetId = form?.targetId?.value?.trim()
+      const id = form?.id?.value?.trim()
+      if (!targetId || !id) return
+      state.comments[targetId] = (state.comments[targetId] || []).filter((c) => c.id !== id)
+      saveComments()
+      commitJsonToRepo('data/comments.json', state.comments, `admin: delete comment ${targetId}/${id}`)
+        .then((ok) => {
+          if (ok) {
+            alert('Comment deleted and committed.')
+            render()
+          }
+        })
+        .catch((err) => alert(err.message))
+    }
+  })
+
+  document.addEventListener('submit', async (event) => {
+    const commentForm = event.target.closest('[data-comment-form]')
+    const replyForm = event.target.closest('[data-reply-form]')
+    const communityForm = event.target.closest('[data-community-create-form]')
+    const authRegisterForm = event.target.closest('[data-auth-register]')
+    const authLoginForm = event.target.closest('[data-auth-login]')
+    const accountProfileForm = event.target.closest('[data-account-profile-form]')
+    const accountDeleteForm = event.target.closest('[data-account-delete-form]')
+        if (replyForm) {
+          event.preventDefault()
+          const nickname = ensureNickname()
+          if (!nickname) return
+          const replyKey = replyForm.dataset.replyForm || ''
+          const splitIndex = replyKey.lastIndexOf(':')
+          if (splitIndex <= 0 || splitIndex >= replyKey.length - 1) return
+          const targetId = replyKey.slice(0, splitIndex)
+          const commentId = replyKey.slice(splitIndex + 1)
+          const content = replyForm.reply.value.trim()
+          if (!content) return
+          const list = state.comments[targetId] || []
+          const parent = list.find((item) => item.id === commentId)
+          if (!parent) return
+          parent.replies ||= []
+          parent.replies.push({
+            id: uid(),
+            nickname,
+            content,
+            createdAt: new Date().toISOString(),
+          })
+          saveComments()
+          if (isAdmin() && hasRepoConfig()) {
+            await commitJsonToRepo('data/comments.json', state.comments, `admin: add reply ${targetId}/${commentId}`)
+          }
+          render()
+          return
+        }
+
+    if (authRegisterForm) {
+      event.preventDefault()
+      const nickname = authRegisterForm.nickname.value.trim().slice(0, 24)
+      const password = authRegisterForm.password.value
+      const passwordConfirm = authRegisterForm.passwordConfirm.value
+      const profileImage = await resolveImageInput(authRegisterForm.imageUrl.value, authRegisterForm.imageFile)
+
+      if (!nickname) {
+        alert('Please enter a nickname.')
+        return
+      }
+      if (password.length < 4) {
+        alert('Password must be at least 4 characters.')
+        return
+      }
+      if (password !== passwordConfirm) {
+        alert('Passwords do not match.')
+        return
+      }
+
+      try {
+        const result = await registerNickname(nickname, password, profileImage)
+        localStorage.setItem(STORAGE_KEYS.nickname, result.nickname || nickname)
+        localStorage.removeItem(STORAGE_KEYS.admin)
+        state.userProfileImage = result.profileImage || ''
+        state.authModalOpen = false
+        state.authMode = 'login'
+        alert('Account created and logged in.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to create account.')
+      }
+      return
+    }
+
+    if (authLoginForm) {
+      event.preventDefault()
+      const nickname = authLoginForm.nickname.value.trim()
+      const password = authLoginForm.password.value
+      if (!nickname || !password) {
+        alert('Please enter nickname and password.')
+        return
+      }
+
+      try {
+        const result = await loginNickname(nickname, password)
+        localStorage.setItem(STORAGE_KEYS.nickname, result.nickname || nickname)
+        if (isProtectedAdminNickname(result.nickname || nickname)) {
+          localStorage.setItem(STORAGE_KEYS.admin, 'true')
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.admin)
+        }
+        state.userProfileImage = result.profileImage || ''
+        state.authModalOpen = false
+        state.authMode = 'login'
+        alert('Logged in.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Login failed.')
+      }
+      return
+    }
+
+    if (accountProfileForm) {
+      event.preventDefault()
+      const nickname = getNickname()
+      if (!nickname || isProtectedAdminNickname(nickname)) return
+
+      const password = accountProfileForm.password.value
+      const profileImage = await resolveImageInput(
+        accountProfileForm.imageUrl.value,
+        accountProfileForm.imageFile,
+      )
+
+      try {
+        const result = await updateUserProfileImage({ nickname, password, profileImage })
+        state.userProfileImage = result.profileImage || ''
+        state.accountManageMode = ''
+        alert('Profile photo updated.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to update profile photo.')
+      }
+      return
+    }
+
+    if (accountDeleteForm) {
+      event.preventDefault()
+      const nickname = getNickname()
+      if (!nickname || isProtectedAdminNickname(nickname)) return
+
+      const confirmText = accountDeleteForm.confirm.value.trim()
+      const password = accountDeleteForm.password.value
+      if (confirmText !== 'DELETE') {
+        alert('Please type DELETE to confirm.')
+        return
+      }
+
+      try {
+        await deleteUserAccount({ nickname, password })
+        localStorage.removeItem(STORAGE_KEYS.nickname)
+        state.userProfileImage = ''
+        state.accountMenuOpen = false
+        state.accountManageMode = ''
+        alert('Account deleted.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to delete account.')
+      }
+      return
+    }
+
+    const adminLogin = event.target.closest('[data-admin-login]')
+    const adminEditor = event.target.closest('[data-admin-editor]')
+    const repoForm = event.target.closest('[data-admin-repo-config]')
+    const pensForm = event.target.closest('[data-admin-pens]')
+    const blogsForm = event.target.closest('[data-admin-blogs]')
+    const adminCommunityForm = event.target.closest('[data-admin-community]')
+    const adminCommentsForm = event.target.closest('[data-admin-comments]')
+
+    if (repoForm) {
+      event.preventDefault()
+      state.repoConfig = {
+        owner: repoForm.owner.value.trim(),
+        repo: repoForm.repo.value.trim(),
+        branch: repoForm.branch.value.trim() || 'main',
+        token: repoForm.token.value.trim(),
+      }
+      saveRepoConfig()
+      alert('Repository settings saved.')
+      return
+    }
+
+    if (pensForm) {
+      event.preventDefault()
+      const payload = {
+        id: pensForm.id.value.trim(),
+        name: pensForm.name.value.trim(),
+        series: pensForm.series.value.trim(),
+        year: Number(pensForm.year.value),
+        createdAt: new Date().toISOString(),
+        description: pensForm.description.value.trim(),
+        descriptionLong: pensForm.descriptionLong.value.trim(),
+        keywords: parseCsv(pensForm.keywords.value),
+        images: parseLines(pensForm.images.value),
+      }
+      upsertBy(state.pens, 'id', payload)
+      const ok = await commitJsonToRepo('data/pens.json', state.pens, `admin: upsert pen ${payload.id}`)
+      if (ok) {
+        alert('Collection item saved and committed.')
+        render()
+      }
+      return
+    }
+
+    if (blogsForm) {
+      event.preventDefault()
+      const payload = {
+        slug: blogsForm.slug.value.trim(),
+        title: blogsForm.title.value.trim(),
+        subtitle: blogsForm.subtitle.value.trim(),
+        coverImage: blogsForm.coverImage.value.trim(),
+        category: blogsForm.category.value.trim(),
+        tags: parseCsv(blogsForm.tags.value),
+        publishedAt: blogsForm.publishedAt.value.trim() || new Date().toISOString(),
+        readingTime: Number(blogsForm.readingTime.value || 5),
+        content: blogsForm.content.value,
+      }
+      upsertBy(state.blogs, 'slug', payload)
+      const ok = await commitJsonToRepo('data/blog.json', state.blogs, `admin: upsert blog ${payload.slug}`)
+      if (ok) {
+        alert('Blog post saved and committed.')
+        render()
+      }
+      return
+    }
+
+    if (adminCommunityForm) {
+      event.preventDefault()
+      const payload = {
+        id: adminCommunityForm.id.value.trim(),
+        nickname: adminCommunityForm.nickname.value.trim(),
+        title: adminCommunityForm.title.value.trim(),
+        content: adminCommunityForm.content.value.trim(),
+        image: adminCommunityForm.image.value.trim(),
+        likes: Number(adminCommunityForm.likes.value || 0),
+        pinned: adminCommunityForm.pinned.checked,
+        createdAt: adminCommunityForm.createdAt.value.trim() || new Date().toISOString(),
+      }
+      upsertBy(state.community, 'id', payload)
+      saveCommunity()
+      const ok = await commitJsonToRepo(
+        'data/community.json',
+        state.community,
+        `admin: upsert community ${payload.id}`,
+      )
+      if (ok) {
+        alert('Community post saved and committed.')
+        render()
+      }
+      return
+    }
+
+    if (adminCommentsForm) {
+      event.preventDefault()
+      const targetId = adminCommentsForm.targetId.value.trim()
+      const payload = {
+        id: adminCommentsForm.id.value.trim(),
+        nickname: adminCommentsForm.nickname.value.trim(),
+        content: adminCommentsForm.content.value.trim(),
+        image: adminCommentsForm.image.value.trim(),
+        likes: Number(adminCommentsForm.likes.value || 0),
+        createdAt: adminCommentsForm.createdAt.value.trim() || new Date().toISOString(),
+        replies: [],
+      }
+      state.comments[targetId] ||= []
+      upsertBy(state.comments[targetId], 'id', payload)
+      saveComments()
+      const ok = await commitJsonToRepo(
+        'data/comments.json',
+        state.comments,
+        `admin: upsert comment ${targetId}/${payload.id}`,
+      )
+      if (ok) {
+        alert('Comment saved and committed.')
+        render()
+      }
+      return
+    }
+
+    if (communityForm) {
+      event.preventDefault()
+      const nickname = ensureNickname()
+      if (!nickname) return
+      const title = communityForm.title.value.trim()
+      const content = communityForm.content.value.trim()
+      if (!title || !content) return
+      const image = await resolveImageInput(communityForm.imageUrl.value, communityForm.imageFile)
+
+      state.community.unshift({
+        id: uid(),
+        nickname,
+        title,
+        content,
+        image,
+        likes: 0,
+        pinned: false,
+        createdAt: new Date().toISOString(),
+      })
+      saveCommunity()
+      document.querySelector('.compose-modal')?.remove()
+      render()
+      return
+    }
+
+    if (commentForm) {
+      event.preventDefault()
+      const targetId = commentForm.dataset.commentForm
+      const nickname = ensureNickname()
+      if (!nickname) return
+      const content = commentForm.comment.value.trim()
+      if (!content) return
+      const image = await resolveImageInput(commentForm.imageUrl.value, commentForm.imageFile)
+      state.comments[targetId] ||= []
+      state.comments[targetId].unshift({
+        id: uid(),
+        nickname,
+        content,
+        image,
+        likes: 0,
+        createdAt: new Date().toISOString(),
+        replies: [],
+      })
+      saveComments()
+      render()
+      return
+    }
+
+    if (adminLogin) {
+      event.preventDefault()
+      const nickname = adminLogin.nickname.value.trim()
+      const value = adminLogin.password.value
+      if (nickname === 'i_luv_pen' && value === 'iluvpen-admin') {
+        localStorage.setItem(STORAGE_KEYS.nickname, 'i_luv_pen')
+        localStorage.setItem(STORAGE_KEYS.admin, 'true')
+        state.userProfileImage = ''
+        render()
+      } else {
+        alert('Incorrect admin nickname or password.')
+      }
+    }
+
+    if (adminEditor) {
+      event.preventDefault()
+      const payload = {
+        id: uid(),
+        type: adminEditor.type.value,
+        title: adminEditor.title.value,
+        summary: adminEditor.summary.value,
+        content: adminEditor.content.value,
+        image: adminEditor.image.value,
+        savedAt: new Date().toISOString(),
+      }
+      const key = payload.type === 'pen' ? 'iluvpen_draft_pen' : 'iluvpen_draft_blog'
+      localStorage.setItem(key, JSON.stringify(payload))
+      alert('Draft saved.')
+    }
+  })
+
+  document.addEventListener('change', (event) => {
+    const collectionFilter = event.target.closest('[data-collection-filter]')
+    const communitySort = event.target.closest('[data-community-sort]')
+    const languageSelect = event.target.closest('[data-language-select]')
+    const imageFileInput = event.target.matches('input[name="imageFile"]') ? event.target : null
+
+    if (imageFileInput) {
+      const container = imageFileInput.closest('label') || imageFileInput.closest('form')
+      const fileNameEl = container?.querySelector('[data-file-name]')
+      if (fileNameEl) {
+        fileNameEl.textContent = imageFileInput.files?.[0]?.name || 'No file chosen'
+      }
+      return
+    }
+
+    if (languageSelect) {
+      state.lang = languageSelect.value
+      localStorage.setItem(STORAGE_KEYS.lang, state.lang)
+      render()
+      return
+    }
+
+    if (collectionFilter) {
+      const q = collectionFilter.q.value
+      const sort = collectionFilter.sort.value
+      const qs = new URLSearchParams()
+      if (q) qs.set('q', q)
+      if (sort) qs.set('sort', sort)
+      history.replaceState({}, '', `${location.pathname}?${qs.toString()}${location.hash}`)
+      render()
+    }
+
+    if (communitySort) {
+      const sort = communitySort.sort.value
+      const qs = new URLSearchParams(location.search)
+      qs.set('sort', sort)
+      history.replaceState({}, '', `${location.pathname}?${qs.toString()}${location.hash}`)
+      render()
+    }
+  })
+
+  document.addEventListener('input', (event) => {
+    const global = event.target.closest('[data-global-search]')
+    if (!global) return
+    const q = global.value.toLowerCase()
+    const result = state.pens.filter((pen) => {
+      const target = [pen.name, pen.series, pen.year, ...(pen.keywords || [])].join(' ').toLowerCase()
+      return target.includes(q)
+    })
+    const container = document.querySelector('#search-results')
+    container.innerHTML = result
+      .map(
+        (pen) => `<article class="list-item" data-open-pen="${pen.id}"><h3>${escapeHtml(pen.name)}</h3><p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p></article>`,
+      )
+      .join('')
+  })
+}
+
+const registerServiceWorker = () => {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(`${BASE_URL}sw.js`).catch(() => {
+        // no-op
+      })
+    })
+  }
+}
+
+const render = () => {
+  state.currentRoute = parseHashRoute()
+  if (state.currentRoute.page === 'blog') {
+    state.currentRoute.page = 'news'
+  }
+  renderLayout()
+  bindAdminEntityPickers()
+}
+
+const parseLines = (value) =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+const parseCsv = (value) =>
+  value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const upsertBy = (list, key, item) => {
+  const idx = list.findIndex((x) => x[key] === item[key])
+  if (idx >= 0) list[idx] = item
+  else list.unshift(item)
+}
+
+const ensureTestCommentsSeed = () => {
+  if (USE_REMOTE_DB) return false
+  if (localStorage.getItem(STORAGE_KEYS.testCommentsSeeded) === '1') return false
+
+  const targets = [
+    ...state.blogs.map((post) => `news:${post.slug}`),
+    ...state.community.map((post) => `community:${post.id}`),
+  ]
+  if (!targets.length) return false
+
+  const templates = [
+    'Nice writing flow and structure.',
+    'The tone feels premium and easy to read.',
+    'I would love a follow-up comparison post.',
+    'This tip is practical for everyday use.',
+    'Great summary, thanks for sharing.',
+    'The image and text balance looks clean.',
+    'Helpful perspective for beginners too.',
+    'I tested this and had a similar result.',
+    'Could you also cover long-term maintenance?',
+    'Bookmarking this for later reference.',
+  ]
+
+  const baseTime = Date.now()
+  let created = 0
+  for (let i = 0; i < 10; i += 1) {
+    const targetId = targets[i % targets.length]
+    state.comments[targetId] ||= []
+    state.comments[targetId].push({
+      id: `test-${uid()}`,
+      nickname: `tester_${(i % 5) + 1}`,
+      content: `[TEST_SEED] ${templates[i % templates.length]}`,
+      image: '',
+      likes: (i * 3) % 17,
+      createdAt: new Date(baseTime - i * 3600000).toISOString(),
+      replies: [],
+    })
+    created += 1
+  }
+
+  if (created > 0) {
+    localStorage.setItem(STORAGE_KEYS.testCommentsSeeded, '1')
+    saveComments()
+    return true
+  }
+
+  return false
+}
+
+const bindAdminEntityPickers = () => {
+  const penForm = document.querySelector('[data-admin-pens]')
+  const blogForm = document.querySelector('[data-admin-blogs]')
+  const communityForm = document.querySelector('[data-admin-community]')
+
+  if (penForm) {
+    penForm.pick.addEventListener('change', () => {
+      const selected = state.pens.find((p) => p.id === penForm.pick.value)
+      if (!selected) {
+        penForm.reset()
+        return
+      }
+      penForm.id.value = selected.id
+      penForm.name.value = selected.name
+      penForm.series.value = selected.series
+      penForm.year.value = selected.year
+      penForm.description.value = selected.description || ''
+      penForm.descriptionLong.value = selected.descriptionLong || ''
+      penForm.images.value = (selected.images || []).join('\n')
+      penForm.keywords.value = (selected.keywords || []).join(', ')
+    })
+  }
+
+  if (blogForm) {
+    blogForm.pick.addEventListener('change', () => {
+      const selected = state.blogs.find((b) => b.slug === blogForm.pick.value)
+      if (!selected) {
+        blogForm.reset()
+        return
+      }
+      blogForm.slug.value = selected.slug
+      blogForm.title.value = selected.title
+      blogForm.subtitle.value = selected.subtitle
+      blogForm.category.value = selected.category
+      blogForm.tags.value = (selected.tags || []).join(', ')
+      blogForm.coverImage.value = selected.coverImage || ''
+      blogForm.publishedAt.value = selected.publishedAt || ''
+      blogForm.readingTime.value = selected.readingTime || 5
+      blogForm.content.value = selected.content || ''
+    })
+  }
+
+  if (communityForm) {
+    communityForm.pick.addEventListener('change', () => {
+      const selected = state.community.find((c) => c.id === communityForm.pick.value)
+      if (!selected) {
+        communityForm.reset()
+        return
+      }
+      communityForm.id.value = selected.id
+      communityForm.nickname.value = selected.nickname
+      communityForm.title.value = selected.title
+      communityForm.content.value = selected.content
+      communityForm.image.value = selected.image || ''
+      communityForm.likes.value = selected.likes || 0
+      communityForm.createdAt.value = selected.createdAt || ''
+      communityForm.pinned.checked = !!selected.pinned
+    })
+  }
+}
+
+export const bootstrapApp = async (rootEl) => {
+  if (!rootEl) return
+  state.lang = getPreferredLanguage()
+  state.repoConfig = getSavedRepoConfig()
+  applyTheme()
+
+  const [pens, blogs, community, site, commentsFromFile] = await Promise.all([
+    loadJson('data/pens.json'),
+    loadJson('data/blog.json'),
+    loadJson('data/community.json'),
+    loadJson('data/site.json'),
+    loadJson('data/comments.json').catch(() => ({})),
+  ])
+
+  state.pens = pens
+  state.blogs = blogs
+  state.site = site
+
+  const currentNickname = getNickname()
+  if (currentNickname) {
+    try {
+      const profile = await getUserProfile(currentNickname)
+      state.userProfileImage = profile.profileImage || ''
+    } catch {
+      state.userProfileImage = getLocalUserProfileImage(currentNickname)
+    }
+  } else {
+    state.userProfileImage = ''
+  }
+
+  let apiCommunity = null
+  let apiComments = null
+  if (USE_REMOTE_DB) {
+    try {
+      ;[apiCommunity, apiComments] = await Promise.all([
+        apiRequest('/api/state/community'),
+        apiRequest('/api/state/comments-map'),
+      ])
+    } catch (error) {
+      console.error('Failed to load remote DB state.', error)
+    }
+  }
+
+  if (USE_REMOTE_DB) {
+    state.community = Array.isArray(apiCommunity) ? apiCommunity : []
+  } else {
+    const cachedCommunity = localStorage.getItem(STORAGE_KEYS.community)
+    state.community = cachedCommunity ? JSON.parse(cachedCommunity) : community
+  }
+  if (USE_REMOTE_DB) {
+    state.comments = apiComments && typeof apiComments === 'object' && !Array.isArray(apiComments) ? apiComments : {}
+  } else {
+    const cachedComments = localStorage.getItem(STORAGE_KEYS.comments)
+    state.comments = cachedComments ? JSON.parse(cachedComments) : commentsFromFile
+  }
+
+  ensureTestCommentsSeed()
+
+  bindCarousel()
+  bindInteractions()
+
+  window.addEventListener('hashchange', render)
+  window.addEventListener('popstate', render)
+
+  if (!location.hash) location.hash = '#/home'
+  render()
+  registerServiceWorker()
+}

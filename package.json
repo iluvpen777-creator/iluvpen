@@ -1,0 +1,26 @@
+{
+  "name": "i_luv_pen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:api": "node server/index.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
+    "start:api": "node server/index.js",
+    "db:check": "node server/check-db.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "vite": "^8.1.1"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
+  }
+}

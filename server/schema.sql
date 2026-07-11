@@ -1,0 +1,55 @@
+-- i_luv_pen PostgreSQL schema
+-- Supports community posts, comments, threaded replies, and @mentions.
+
+create table if not exists users (
+  id bigserial primary key,
+  nickname text not null unique,
+  password_hash text not null,
+  profile_image text,
+  created_at timestamptz not null default now()
+);
+
+alter table users
+  add column if not exists password_hash text;
+
+alter table users
+  add column if not exists profile_image text;
+
+create table if not exists community_posts (
+  id text primary key,
+  nickname text not null,
+  topic text not null default 'General',
+  title text not null,
+  content text not null,
+  image text,
+  likes integer not null default 0,
+  pinned boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table community_posts
+  add column if not exists topic text not null default 'General';
+
+create table if not exists comments (
+  id text primary key,
+  target_id text not null,
+  nickname text not null,
+  content text not null,
+  image text,
+  likes integer not null default 0,
+  parent_id text references comments(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_comments_target_id on comments(target_id);
+create index if not exists idx_comments_parent_id on comments(parent_id);
+
+create table if not exists comment_mentions (
+  id bigserial primary key,
+  comment_id text not null references comments(id) on delete cascade,
+  mentioned_nickname text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_comment_mentions_comment_id on comment_mentions(comment_id);
+create index if not exists idx_comment_mentions_nickname on comment_mentions(mentioned_nickname);

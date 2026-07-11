@@ -1,0 +1,62 @@
+[
+  {
+    "id": "pelikan-m1000-raden",
+    "name": "Pelikan M1000 Raden Sunrise",
+    "series": "Maki-e",
+    "year": 2024,
+    "createdAt": "2025-02-13T10:00:00.000Z",
+    "description": "A radiant raden finish paired with a large 18K nib.",
+    "descriptionLong": "One of Pelikan's most sought-after artisan models. It features refined raden textures and a reliable large piston-filling system.",
+    "keywords": ["pelikan", "maki-e", "raden", "18k", "collector"],
+    "images": [
+      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1400&q=80"
+    ]
+  },
+  {
+    "id": "montblanc-149-calligraphy",
+    "name": "Montblanc 149 Calligraphy Flex",
+    "series": "Meisterstuck",
+    "year": 2023,
+    "createdAt": "2024-08-15T10:00:00.000Z",
+    "description": "A signature model combining the classic 149 body with a flexible nib.",
+    "descriptionLong": "It delivers dramatic line variation under pressure while balancing heritage design and modern writing performance.",
+    "keywords": ["montblanc", "149", "flex", "meisterstuck"],
+    "images": [
+      "https://images.unsplash.com/photo-1499257398700-43669759a540?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1456324463128-7ff6903988d8?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1200&q=80"
+    ]
+  },
+  {
+    "id": "namiki-emperor-urushi",
+    "name": "Namiki Emperor Vermilion Urushi",
+    "series": "Emperor",
+    "year": 2022,
+    "createdAt": "2024-06-01T10:00:00.000Z",
+    "description": "Layered urushi lacquer on an ebonite body, iconic in both tradition and presence.",
+    "descriptionLong": "Known for its oversized body and expressive No.50 nib. The urushi surface develops deeper luster over time.",
+    "keywords": ["namiki", "urushi", "emperor", "japan"],
+    "images": [
+      "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1516534775068-ba3e7458af70?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=1200&q=80"
+    ]
+  },
+  {
+    "id": "sailor-king-of-pen-ebi",
+    "name": "Sailor King of Pen Ebonite",
+    "series": "King of Pen",
+    "year": 2021,
+    "createdAt": "2023-12-21T10:00:00.000Z",
+    "description": "A dense writing feel from a thick ebonite barrel and a large 21K nib.",
+    "descriptionLong": "A standout model loved for restrained Japanese design and exceptionally smooth writing feel.",
+    "keywords": ["sailor", "21k", "ebonite", "king of pen"],
+    "images": [
+      "https://images.unsplash.com/photo-1470790376778-a9fbc86d70e2?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1499257398700-43669759a540?auto=format&fit=crop&w=1200&q=80"
+    ]
+  }
+]
