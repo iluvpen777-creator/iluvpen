@@ -1394,6 +1394,14 @@ const renderAdmin = () => {
           <label>Description<textarea name="description" rows="2" required></textarea></label>
           <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
           <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
+          <label>
+            Upload image file (optional, added to first position)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
           <label>Keywords (comma-separated)<input name="keywords" /></label>
           <div class="editor-actions">
             <button type="submit" class="btn">Add/Update + Commit</button>
@@ -1413,7 +1421,15 @@ const renderAdmin = () => {
           <label>Subtitle<input name="subtitle" required /></label>
           <label>Category<input name="category" required /></label>
           <label>Tags (comma-separated)<input name="tags" /></label>
-          <label>Cover image URL<input name="coverImage" type="url" required /></label>
+          <label>Cover image URL (optional)<input name="coverImage" type="url" /></label>
+          <label>
+            Cover image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
           <label>Published at (ISO)<input name="publishedAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
           <label>Reading time (minutes)<input name="readingTime" type="number" min="1" value="5" /></label>
           <label>Content (Markdown)<textarea name="content" rows="6" required></textarea></label>
@@ -1435,6 +1451,14 @@ const renderAdmin = () => {
           <label>Title<input name="title" required /></label>
           <label>Content<textarea name="content" rows="4" required></textarea></label>
           <label>Image URL<input name="image" type="url" /></label>
+          <label>
+            Image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
           <label>Likes<input name="likes" type="number" value="0" /></label>
           <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
           <label><input name="pinned" type="checkbox" /> Pin by admin</label>
@@ -1453,6 +1477,14 @@ const renderAdmin = () => {
           <label>Nickname<input name="nickname" required /></label>
           <label>Content<textarea name="content" rows="3" required></textarea></label>
           <label>Image URL<input name="image" type="url" /></label>
+          <label>
+            Image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
           <label>Likes<input name="likes" type="number" value="0" /></label>
           <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
           <div class="editor-actions">
@@ -2494,6 +2526,11 @@ const bindInteractions = () => {
 
     if (pensForm) {
       event.preventDefault()
+      const uploadedImage = await resolveImageInput('', pensForm.imageFile)
+      const images = parseLines(pensForm.images.value)
+      if (uploadedImage) {
+        images.unshift(uploadedImage)
+      }
       const payload = {
         id: pensForm.id.value.trim(),
         name: pensForm.name.value.trim(),
@@ -2503,7 +2540,7 @@ const bindInteractions = () => {
         description: pensForm.description.value.trim(),
         descriptionLong: pensForm.descriptionLong.value.trim(),
         keywords: parseCsv(pensForm.keywords.value),
-        images: parseLines(pensForm.images.value),
+        images,
       }
       upsertBy(state.pens, 'id', payload)
       const ok = await commitJsonToRepo('data/pens.json', state.pens, `admin: upsert pen ${payload.id}`)
@@ -2516,11 +2553,12 @@ const bindInteractions = () => {
 
     if (blogsForm) {
       event.preventDefault()
+      const coverImage = await resolveImageInput(blogsForm.coverImage.value, blogsForm.imageFile)
       const payload = {
         slug: blogsForm.slug.value.trim(),
         title: blogsForm.title.value.trim(),
         subtitle: blogsForm.subtitle.value.trim(),
-        coverImage: blogsForm.coverImage.value.trim(),
+        coverImage,
         category: blogsForm.category.value.trim(),
         tags: parseCsv(blogsForm.tags.value),
         publishedAt: blogsForm.publishedAt.value.trim() || new Date().toISOString(),
@@ -2538,12 +2576,13 @@ const bindInteractions = () => {
 
     if (adminCommunityForm) {
       event.preventDefault()
+      const image = await resolveImageInput(adminCommunityForm.image.value, adminCommunityForm.imageFile)
       const payload = {
         id: adminCommunityForm.id.value.trim(),
         nickname: adminCommunityForm.nickname.value.trim(),
         title: adminCommunityForm.title.value.trim(),
         content: adminCommunityForm.content.value.trim(),
-        image: adminCommunityForm.image.value.trim(),
+        image,
         likes: Number(adminCommunityForm.likes.value || 0),
         pinned: adminCommunityForm.pinned.checked,
         createdAt: adminCommunityForm.createdAt.value.trim() || new Date().toISOString(),
@@ -2565,11 +2604,12 @@ const bindInteractions = () => {
     if (adminCommentsForm) {
       event.preventDefault()
       const targetId = adminCommentsForm.targetId.value.trim()
+      const image = await resolveImageInput(adminCommentsForm.image.value, adminCommentsForm.imageFile)
       const payload = {
         id: adminCommentsForm.id.value.trim(),
         nickname: adminCommentsForm.nickname.value.trim(),
         content: adminCommentsForm.content.value.trim(),
-        image: adminCommentsForm.image.value.trim(),
+        image,
         likes: Number(adminCommentsForm.likes.value || 0),
         createdAt: adminCommentsForm.createdAt.value.trim() || new Date().toISOString(),
         replies: [],
