@@ -644,17 +644,57 @@ const fileToDataUrl = (file) =>
     reader.readAsDataURL(file)
   })
 
-const resolveImageInput = async (urlValue, fileInput) => {
-  const byUrl = (urlValue || '').trim()
-  if (byUrl) return byUrl
-
-  const file = fileInput?.files?.[0]
-  if (!file) return ''
-  if (!file.type.startsWith('image/')) {
-    alert('Only image files can be uploaded.')
-    return ''
+const parseImageValues = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean)
   }
-  return fileToDataUrl(file)
+
+  const text = String(value || '').trim()
+  if (!text) return []
+
+  if (text.startsWith('[') && text.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(text)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item || '').trim()).filter(Boolean)
+      }
+    } catch {
+      // fall back to line-based parsing
+    }
+  }
+
+  return text
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const getFirstImageValue = (value) => parseImageValues(value)[0] || ''
+
+const getSelectedFileLabel = (fileInput) => {
+  const count = fileInput?.files?.length || 0
+  if (!count) return 'No file chosen'
+  if (count === 1) return fileInput.files?.[0]?.name || 'No file chosen'
+  return `${count} files chosen`
+}
+
+const resolveImageInputs = async (urlValue, fileInput) => {
+  const urls = parseImageValues(urlValue)
+  if (urls.length) return urls
+
+  const files = Array.from(fileInput?.files || [])
+  if (!files.length) return []
+  if (files.some((file) => !file.type.startsWith('image/'))) {
+    alert('Only image files can be uploaded.')
+    return []
+  }
+
+  return Promise.all(files.map((file) => fileToDataUrl(file)))
+}
+
+const resolveImageInput = async (urlValue, fileInput) => {
+  const images = await resolveImageInputs(urlValue, fileInput)
+  return images[0] || ''
 }
 
 const getFirstImageLine = (value) =>
@@ -673,7 +713,7 @@ const getFormImagePreviewSource = async (form) => {
   }
 
   const urlInput = form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"]')
-  const byUrl = (urlInput?.value || '').trim()
+  const byUrl = getFirstImageValue(urlInput?.value || '')
   if (byUrl) return byUrl
 
   const imagesArea = form.querySelector('textarea[name="images"]')
@@ -920,11 +960,12 @@ const renderCommentList = (targetId) => {
             </button>
           </div>
           <p class="comment-text">${renderMentionedText(comment.content)}</p>
-          ${
-            comment.image
-              ? `<img src="${escapeHtml(comment.image)}" alt="Attached image" class="comment-image" loading="lazy" />`
-              : ''
-          }
+          ${parseImageValues(comment.image)
+            .map(
+              (image, index) =>
+                `<img src="${escapeHtml(image)}" alt="Attached image ${index + 1}" class="comment-image" loading="lazy" />`,
+            )
+            .join('')}
           <div class="comment-actions">
             <span class="comment-like-count">Likes ${comment.likes}</span>
             <button data-reply-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn">Reply</button>
@@ -973,7 +1014,7 @@ const renderCommentComposer = (targetId) => `
       </label>
       <label>
         Image file (optional)
-        <input name="imageFile" type="file" accept="image/*" hidden />
+        <input name="imageFile" type="file" accept="image/*" multiple hidden />
         <div class="editor-actions file-picker">
           <button type="button" class="btn ghost" data-pick-file>Choose file</button>
           <span class="muted" data-file-name>No file chosen</span>
@@ -1007,7 +1048,7 @@ const renderCommunityComposer = () => `
           </label>
           <label>
             Image file (optional)
-            <input name="imageFile" type="file" accept="image/*" hidden />
+            <input name="imageFile" type="file" accept="image/*" multiple hidden />
             <div class="editor-actions file-picker">
               <button type="button" class="btn ghost" data-pick-file>Choose file</button>
               <span class="muted" data-file-name>No file chosen</span>
@@ -1123,7 +1164,7 @@ const askAdminImageSource = (title, initialUrl = '') =>
 
     picker.addEventListener('click', () => fileInput.click())
     fileInput.addEventListener('change', () => {
-      fileName.textContent = fileInput.files?.[0]?.name || 'No file chosen'
+      fileName.textContent = getSelectedFileLabel(fileInput)
       syncImagePreviewForForm(adminImageForm)
     })
     adminImageForm.imageUrl.addEventListener('input', () => {
@@ -1423,8 +1464,8 @@ const renderCommunityBoard = (params) => {
         (post) => `<a class="board-row ${post.pinned ? 'pinned' : ''}" href="#/community/${post.id}">
           <span class="board-title-wrap">
             ${
-              post.image
-                ? `<img src="${escapeHtml(post.image)}" alt="Post thumbnail" class="board-thumb" loading="lazy" />`
+              getFirstImageValue(post.image)
+                ? `<img src="${escapeHtml(getFirstImageValue(post.image))}" alt="Post thumbnail" class="board-thumb" loading="lazy" />`
                 : ''
             }
             <span class="board-title">${escapeHtml(post.title)} <em class="board-count">[${getComments(`community:${post.id}`).length}]</em></span>
@@ -1453,7 +1494,12 @@ const renderCommunityDetail = (postId) => {
       </div>
       <h3 class="social-title">${escapeHtml(post.title)}</h3>
       <p class="social-text">${escapeHtml(post.content)}</p>
-      ${post.image ? `<img src="${escapeHtml(post.image)}" alt="Attached image" class="community-image" loading="lazy" />` : ''}
+      ${parseImageValues(post.image)
+        .map(
+          (image, index) =>
+            `<img src="${escapeHtml(image)}" alt="Attached image ${index + 1}" class="community-image" loading="lazy" />`,
+        )
+        .join('')}
       <div class="post-actions">
         <button type="button" class="text-btn community-like-btn ${hasLiked('community', post.id) ? 'liked' : ''}" data-like-community="${post.id}">${
           hasLiked('community', post.id) ? '♥' : '♡'
@@ -1561,7 +1607,7 @@ const renderAdmin = () => {
           <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
           <label>
             Upload image file (optional, added to first position)
-            <input name="imageFile" type="file" accept="image/*" hidden />
+            <input name="imageFile" type="file" accept="image/*" multiple hidden />
             <div class="editor-actions file-picker">
               <button type="button" class="btn ghost" data-pick-file>Choose file</button>
               <span class="muted" data-file-name>No file chosen</span>
@@ -1591,7 +1637,7 @@ const renderAdmin = () => {
           <label>Cover image URL (optional)<input name="coverImage" type="url" /></label>
           <label>
             Cover image file (optional)
-            <input name="imageFile" type="file" accept="image/*" hidden />
+            <input name="imageFile" type="file" accept="image/*" multiple hidden />
             <div class="editor-actions file-picker">
               <button type="button" class="btn ghost" data-pick-file>Choose file</button>
               <span class="muted" data-file-name>No file chosen</span>
@@ -1619,7 +1665,7 @@ const renderAdmin = () => {
           <label>Image URL<input name="image" type="url" /></label>
           <label>
             Image file (optional)
-            <input name="imageFile" type="file" accept="image/*" hidden />
+            <input name="imageFile" type="file" accept="image/*" multiple hidden />
             <div class="editor-actions file-picker">
               <button type="button" class="btn ghost" data-pick-file>Choose file</button>
               <span class="muted" data-file-name>No file chosen</span>
@@ -2649,11 +2695,9 @@ const bindInteractions = () => {
 
     if (pensForm) {
       event.preventDefault()
-      const uploadedImage = await resolveImageInput('', pensForm.imageFile)
+      const uploadedImages = await resolveImageInputs('', pensForm.imageFile)
       const images = parseLines(pensForm.images.value)
-      if (uploadedImage) {
-        images.unshift(uploadedImage)
-      }
+      const mergedImages = [...uploadedImages, ...images]
       const payload = {
         id: pensForm.id.value.trim(),
         name: pensForm.name.value.trim(),
@@ -2663,7 +2707,7 @@ const bindInteractions = () => {
         description: pensForm.description.value.trim(),
         descriptionLong: pensForm.descriptionLong.value.trim(),
         keywords: parseCsv(pensForm.keywords.value),
-        images,
+        images: mergedImages,
       }
       upsertBy(state.pens, 'id', payload)
       const ok = await commitJsonToRepo('data/pens.json', state.pens, `admin: upsert pen ${payload.id}`)
@@ -2676,7 +2720,8 @@ const bindInteractions = () => {
 
     if (blogsForm) {
       event.preventDefault()
-      const coverImage = await resolveImageInput(blogsForm.coverImage.value, blogsForm.imageFile)
+      const coverImages = await resolveImageInputs(blogsForm.coverImage.value, blogsForm.imageFile)
+      const coverImage = coverImages[0] || ''
       const payload = {
         slug: blogsForm.slug.value.trim(),
         title: blogsForm.title.value.trim(),
@@ -2700,12 +2745,12 @@ const bindInteractions = () => {
     if (adminCommentsForm) {
       event.preventDefault()
       const targetId = adminCommentsForm.targetId.value.trim()
-      const image = await resolveImageInput(adminCommentsForm.image.value, adminCommentsForm.imageFile)
+      const images = await resolveImageInputs(adminCommentsForm.image.value, adminCommentsForm.imageFile)
       const payload = {
         id: adminCommentsForm.id.value.trim(),
         nickname: adminCommentsForm.nickname.value.trim(),
         content: adminCommentsForm.content.value.trim(),
-        image,
+        image: images.join('\n'),
         likes: Number(adminCommentsForm.likes.value || 0),
         createdAt: adminCommentsForm.createdAt.value.trim() || new Date().toISOString(),
         replies: [],
@@ -2732,14 +2777,14 @@ const bindInteractions = () => {
       const title = communityForm.title.value.trim()
       const content = communityForm.content.value.trim()
       if (!title || !content) return
-      const image = await resolveImageInput(communityForm.imageUrl.value, communityForm.imageFile)
+      const images = await resolveImageInputs(communityForm.imageUrl.value, communityForm.imageFile)
 
       state.community.unshift({
         id: uid(),
         nickname,
         title,
         content,
-        image,
+        image: images.join('\n'),
         likes: 0,
         pinned: false,
         createdAt: new Date().toISOString(),
@@ -2757,13 +2802,13 @@ const bindInteractions = () => {
       if (!nickname) return
       const content = commentForm.comment.value.trim()
       if (!content) return
-      const image = await resolveImageInput(commentForm.imageUrl.value, commentForm.imageFile)
+      const images = await resolveImageInputs(commentForm.imageUrl.value, commentForm.imageFile)
       state.comments[targetId] ||= []
       state.comments[targetId].unshift({
         id: uid(),
         nickname,
         content,
-        image,
+        image: images.join('\n'),
         likes: 0,
         createdAt: new Date().toISOString(),
         replies: [],
@@ -2814,7 +2859,7 @@ const bindInteractions = () => {
       const container = imageFileInput.closest('label') || imageFileInput.closest('form')
       const fileNameEl = container?.querySelector('[data-file-name]')
       if (fileNameEl) {
-        fileNameEl.textContent = imageFileInput.files?.[0]?.name || 'No file chosen'
+        fileNameEl.textContent = getSelectedFileLabel(imageFileInput)
       }
       syncImagePreviewForForm(imageFileInput.closest('form'))
       return
