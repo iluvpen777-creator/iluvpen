@@ -403,6 +403,42 @@ main {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.home-quad-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-quad-grid .card {
+  min-height: 100%;
+}
+
+.home-quad-grid .card-body {
+  padding: 12px;
+}
+
+.home-quad-grid .card-body h3 {
+  margin: 0 0 6px;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  line-height: 1.25;
+}
+
+.home-quad-grid .card-body p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.home-quad-grid .news-card img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
+.home-quad-grid .home-placeholder {
+  display: grid;
+  align-items: center;
+  background: color-mix(in oklab, var(--card), var(--bg) 12%);
+}
+
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1082,6 +1118,10 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .home-quad-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero.hero-feature {
     min-height: min(70vh, 520px);
     background-repeat: no-repeat;
@@ -1173,6 +1213,12 @@ select:focus {
 
   .reply-list {
     max-height: min(24vh, 180px);
+  }
+}
+
+@media (max-width: 560px) {
+  .home-quad-grid {
+    grid-template-columns: 1fr;
   }
 }
 

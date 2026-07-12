@@ -1037,12 +1037,21 @@ const renderPenCarousel = (pen) => {
 }
 
 const renderHome = () => {
-  const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 3)
+  const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 4)
   const newestCollectionPen = [...state.pens].sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   )[0]
-  const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3)
+  const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
+
+  const fillQuadSlots = (items) => {
+    if (items.length >= 4) return items
+    const placeholders = Array.from({ length: 4 - items.length }, (_, idx) => ({ __placeholder: true, __key: `placeholder-${idx}` }))
+    return [...items, ...placeholders]
+  }
+
+  const latestPensQuad = fillQuadSlots(latestPens)
+  const latestNewsQuad = fillQuadSlots(latestNews)
 
   return `
   <section class="hero-shell reveal">
@@ -1061,25 +1070,31 @@ const renderHome = () => {
 
   <section class="section reveal">
     <div class="section-head"><h2>Latest Collection</h2><a href="#/collection">View all</a></div>
-    <div class="grid cards-3">${latestPens
-      .map(
-        (pen) => `<article class="card pen-card" data-open-pen="${pen.id}">
-        ${renderPenCarousel(pen)}
-        <div class="card-body">
-          <h3>${escapeHtml(pen.name)}</h3>
-          <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-          <p>${escapeHtml(pen.description)}</p>
-        </div>
-      </article>`,
-      )
+    <div class="grid home-quad-grid">${latestPensQuad
+      .map((pen) => {
+        if (pen.__placeholder) {
+          return `<article class="card pen-card home-placeholder"><div class="card-body"><h3>Coming Soon</h3><p class="meta">Collection update in progress</p></div></article>`
+        }
+        return `<article class="card pen-card" data-open-pen="${pen.id}">
+          ${renderPenCarousel(pen)}
+          <div class="card-body">
+            <h3>${escapeHtml(pen.name)}</h3>
+            <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            <p>${escapeHtml(pen.description)}</p>
+          </div>
+        </article>`
+      })
       .join('')}</div>
   </section>
 
   <section class="section reveal">
     <div class="section-head"><h2>Latest News</h2><a href="#/news">News</a></div>
-    <div class="grid cards-3">${latestNews
-      .map(
-        (post) => `<article class="card news-card">
+    <div class="grid home-quad-grid">${latestNewsQuad
+      .map((post) => {
+        if (post.__placeholder) {
+          return `<article class="card news-card home-placeholder"><div class="card-body"><h3>Coming Soon</h3><p class="meta">News update in progress</p></div></article>`
+        }
+        return `<article class="card news-card">
           <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
@@ -1087,8 +1102,8 @@ const renderHome = () => {
             <p>${escapeHtml(post.subtitle)}</p>
             <a class="text-link" href="#/news/${post.slug}">Read</a>
           </div>
-        </article>`,
-      )
+        </article>`
+      })
       .join('')}</div>
   </section>
 
