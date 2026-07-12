@@ -1546,7 +1546,7 @@ const renderHeader = () => `
           }</div>`
         : '<button type="button" class="btn ghost" data-pick-nickname>Create account</button>'
     }
-    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">??/button>
+    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">Theme</button>
   </div>
 </header>
 `
