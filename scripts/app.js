@@ -1126,7 +1126,13 @@ const renderHome = () => {
   </section>
 
   <section class="section reveal">
-    <div class="section-head"><h2>Latest News</h2><a href="#/news">News</a></div>
+    <div class="section-head">
+      <h2>Latest News</h2>
+      <div class="home-news-actions">
+        <a class="btn home-white-btn" href="#/news">News</a>
+        <a class="btn home-white-btn" href="#/community">Community</a>
+      </div>
+    </div>
     <div class="grid home-quad-grid">${latestNewsQuad
       .map((post) => {
         if (post.__placeholder) {
@@ -1613,7 +1619,7 @@ const renderQuickLinks = () => `
 
 const renderFooter = () => `
 <footer class="site-footer">
-  <p>짤 ${new Date().getFullYear()} i_luv_pen. Premium Fountain Pen Archive.</p>
+  <p>&copy; ${new Date().getFullYear()} i_luv_pen. Premium Fountain Pen Archive.</p>
   ${isAdmin() ? '<a href="#/admin">Admin</a>' : ''}
 </footer>
 `

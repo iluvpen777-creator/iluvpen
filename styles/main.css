@@ -390,6 +390,22 @@ main {
   margin-bottom: 18px;
 }
 
+.home-news-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-white-btn {
+  background: #ffffff;
+  border-color: #d9d9d9;
+  color: #232323;
+}
+
+.home-white-btn:hover {
+  border-color: #cfcfcf;
+}
+
 .grid {
   display: grid;
   gap: 16px;
