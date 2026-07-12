@@ -827,6 +827,16 @@ select:focus {
   object-fit: cover;
 }
 
+.article-cover-carousel {
+  margin: 16px 0;
+}
+
+.article-cover-carousel .carousel-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
 .article-content {
   display: grid;
   gap: 10px;

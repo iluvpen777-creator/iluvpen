@@ -1675,7 +1675,9 @@ const renderNewsDetail = (slug) => {
       <h1>${escapeHtml(post.title)}</h1>
       <p class="lead">${escapeHtml(post.subtitle)}</p>
       <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min read</p>
-      <img src="${escapeHtml(getFirstImageValue(post.coverImage))}" alt="${escapeHtml(post.title)}" class="article-cover" />
+      <div class="article-cover-carousel">
+        ${renderNewsThumbnailCarousel(post, 'news-detail')}
+      </div>
       <div class="article-content">${markdownToHtml(post.content)}</div>
       <p class="muted">${renderHashtagLine(post.tags)}</p>
       ${
