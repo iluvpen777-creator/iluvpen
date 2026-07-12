@@ -8,13 +8,14 @@ dotenv.config()
 
 const app = express()
 const port = Number(process.env.PORT || process.env.API_PORT || 8787)
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
 
 const corsOrigin = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((v) => v.trim())
   : true
 
 app.use(cors({ origin: corsOrigin }))
-app.use(express.json())
+app.use(express.json({ limit: jsonBodyLimit }))
 
 const safeIso = (value) => {
   if (!value) return new Date().toISOString()
@@ -432,6 +433,21 @@ app.put('/api/state/comments-map', async (req, res) => {
   } finally {
     client.release()
   }
+})
+
+app.use((error, _req, res, next) => {
+  if (error?.type === 'entity.too.large') {
+    return res.status(413).json({
+      ok: false,
+      message: 'Request body is too large. Please upload a smaller image.',
+    })
+  }
+
+  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+    return res.status(400).json({ ok: false, message: 'Invalid JSON payload.' })
+  }
+
+  return next(error)
 })
 
 const server = app.listen(port, () => {

@@ -768,7 +768,16 @@ const apiRequest = async (path, options = {}) => {
   })
 
   if (!response.ok) {
-    const reason = await response.text()
+    const reasonText = await response.text()
+    let reason = reasonText
+    try {
+      const parsed = JSON.parse(reasonText)
+      if (parsed && typeof parsed.message === 'string') {
+        reason = parsed.message
+      }
+    } catch {
+      // keep raw text when response is not JSON
+    }
     throw new Error(`API error: ${response.status} ${reason}`)
   }
 
@@ -814,6 +823,14 @@ const hasRepoConfig = () => {
   return Boolean(owner && repo && branch && token)
 }
 
+const getPersistFailureMessage = (error, fallbackMessage) => {
+  const message = String(error?.message || '')
+  if (message.includes('413') || /too large/i.test(message)) {
+    return 'Image is too large. Please use a smaller image file.'
+  }
+  return fallbackMessage
+}
+
 const saveComments = () => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
@@ -828,7 +845,7 @@ const saveComments = () => {
     body: JSON.stringify({ comments: state.comments }),
   }).catch((error) => {
     console.error('Failed to save comments to DB:', error)
-    alert('Failed to save comments to DB. Please check API/DB status.')
+    alert(getPersistFailureMessage(error, 'Failed to save comments to DB. Please check API/DB status.'))
   })
 }
 
@@ -846,7 +863,7 @@ const saveCommunity = () => {
     body: JSON.stringify({ community: state.community }),
   }).catch((error) => {
     console.error('Failed to save community to DB:', error)
-    alert('Failed to save community to DB. Please check API/DB status.')
+    alert(getPersistFailureMessage(error, 'Failed to save community to DB. Please check API/DB status.'))
   })
 }
 
