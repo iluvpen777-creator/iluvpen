@@ -39,6 +39,10 @@ const STORAGE_KEYS = {
   admin: 'iluvpen_admin_auth',
   resetVersion: 'iluvpen_reset_version',
   likeMarks: 'iluvpen_like_marks',
+  notificationPromptSeen: 'iluvpen_notification_prompt_seen',
+  notificationOptIn: 'iluvpen_notification_opt_in',
+  notificationNewsSeenAt: 'iluvpen_notification_news_seen_at',
+  notificationMentionSeenIds: 'iluvpen_notification_mention_seen_ids',
 }
 
 const DATA_RESET_VERSION = '2026-07-11-clean-all-test-content'
@@ -130,6 +134,15 @@ const renderMentionedText = (value = '') => {
   return escaped
     .replace(/(^|\s)@([a-zA-Z0-9_\-.]+)/g, '$1<span class="mention">@$2</span>')
     .replace(/\n/g, '<br />')
+}
+
+const extractMentionNicknames = (value = '') => {
+  const matches = String(value || '').matchAll(/(^|\s)@([a-zA-Z0-9_\-.]+)/g)
+  const result = []
+  for (const match of matches) {
+    result.push(String(match[2] || '').trim().toLowerCase())
+  }
+  return [...new Set(result.filter(Boolean))]
 }
 
 const renderInlineMarkdown = (value = '') => {
@@ -889,6 +902,137 @@ const saveCommentLike = (commentId, likes) => {
   })
 }
 
+const canUseNotificationApi = () => typeof window !== 'undefined' && 'Notification' in window
+
+const isNotificationOptedIn = () => localStorage.getItem(STORAGE_KEYS.notificationOptIn) === 'true'
+
+const notifyUser = async (title, options = {}) => {
+  if (!canUseNotificationApi()) return
+  if (Notification.permission !== 'granted') return
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration(`${BASE_URL}`)
+      if (registration) {
+        await registration.showNotification(title, {
+          icon: `${BASE_URL}images/profile.jpg`,
+          badge: `${BASE_URL}images/profile.jpg`,
+          ...options,
+        })
+        return
+      }
+    }
+  } catch {
+    // Fallback to Notification constructor below.
+  }
+
+  new Notification(title, options)
+}
+
+const getSeenMentionIds = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.notificationMentionSeenIds) || '[]')
+    return Array.isArray(parsed) ? parsed.map((v) => String(v)) : []
+  } catch {
+    return []
+  }
+}
+
+const setSeenMentionIds = (ids) => {
+  const trimmed = [...new Set(ids.map((v) => String(v)).filter(Boolean))].slice(-500)
+  localStorage.setItem(STORAGE_KEYS.notificationMentionSeenIds, JSON.stringify(trimmed))
+}
+
+const maybeNotifyNewsUpdates = async () => {
+  const latest = [...state.news]
+    .map((item) => ({ slug: item.slug, title: item.title, publishedAt: Number(new Date(item.publishedAt) || 0) }))
+    .filter((item) => item.publishedAt > 0)
+    .sort((a, b) => a.publishedAt - b.publishedAt)
+
+  if (!latest.length) return
+
+  const stored = Number(localStorage.getItem(STORAGE_KEYS.notificationNewsSeenAt) || 0)
+  if (!stored) {
+    localStorage.setItem(STORAGE_KEYS.notificationNewsSeenAt, String(latest[latest.length - 1].publishedAt))
+    return
+  }
+
+  const newsToNotify = latest.filter((item) => item.publishedAt > stored)
+  if (!newsToNotify.length) return
+
+  for (const item of newsToNotify.slice(-3)) {
+    await notifyUser('새 뉴스가 올라왔어요', {
+      body: item.title,
+      data: { url: `${location.origin}${location.pathname}#/news/${item.slug}` },
+    })
+  }
+
+  localStorage.setItem(STORAGE_KEYS.notificationNewsSeenAt, String(newsToNotify[newsToNotify.length - 1].publishedAt))
+}
+
+const maybeNotifyMentions = async () => {
+  const myNickname = getNickname().trim().toLowerCase()
+  if (!myNickname) return
+
+  const seenIds = new Set(getSeenMentionIds())
+  const allMentionIds = new Set(seenIds)
+  const freshMentions = []
+
+  for (const [targetId, comments] of Object.entries(state.comments || {})) {
+    for (const comment of comments || []) {
+      const sourceId = String(comment.id || '')
+      const mentions = extractMentionNicknames(comment.content || '')
+      if (sourceId) allMentionIds.add(sourceId)
+      if (sourceId && !seenIds.has(sourceId) && mentions.includes(myNickname) && !isSameNickname(comment.nickname, myNickname)) {
+        freshMentions.push({ sourceId, targetId, author: comment.nickname || 'Someone', content: comment.content || '' })
+      }
+
+      for (const reply of comment.replies || []) {
+        const replyId = String(reply.id || '')
+        const replyMentions = extractMentionNicknames(reply.content || '')
+        if (replyId) allMentionIds.add(replyId)
+        if (replyId && !seenIds.has(replyId) && replyMentions.includes(myNickname) && !isSameNickname(reply.nickname, myNickname)) {
+          freshMentions.push({ sourceId: replyId, targetId, author: reply.nickname || 'Someone', content: reply.content || '' })
+        }
+      }
+    }
+  }
+
+  if (freshMentions.length) {
+    for (const mention of freshMentions.slice(-3)) {
+      await notifyUser('멘션 알림', {
+        body: `${mention.author}: ${String(mention.content).slice(0, 80)}`,
+        data: { url: `${location.origin}${location.pathname}#/${mention.targetId.startsWith('news:') ? 'news/' + mention.targetId.replace('news:', '') : 'community/' + mention.targetId.replace('community:', '')}` },
+      })
+    }
+  }
+
+  setSeenMentionIds([...allMentionIds])
+}
+
+const maybeRunNotificationChecks = async () => {
+  if (!canUseNotificationApi()) return
+  if (!isNotificationOptedIn()) return
+  if (Notification.permission !== 'granted') return
+  await maybeNotifyNewsUpdates()
+  await maybeNotifyMentions()
+}
+
+const initNotificationConsent = async () => {
+  if (!canUseNotificationApi()) return
+  if (localStorage.getItem(STORAGE_KEYS.notificationPromptSeen) === '1') return
+
+  localStorage.setItem(STORAGE_KEYS.notificationPromptSeen, '1')
+  const accepted = window.confirm('새 뉴스/멘션 알림을 받으시겠어요?')
+  if (!accepted) {
+    localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
+    return
+  }
+
+  const permission = await Notification.requestPermission()
+  localStorage.setItem(STORAGE_KEYS.notificationOptIn, permission === 'granted' ? 'true' : 'false')
+}
+
 const saveCommunity = () => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
@@ -1020,6 +1164,11 @@ const renderCommentList = (targetId) => {
                     (reply) => `<li>
                       <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div></div>
                       <p class="comment-text">${renderMentionedText(reply.content)}</p>
+                      ${
+                        canManageOwnedContent(reply.nickname)
+                          ? `<div class="comment-actions"><button data-delete-reply="${reply.id}" data-parent-comment-id="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button></div>`
+                          : ''
+                      }
                     </li>`,
                   )
                   .join('')}</ul>`
@@ -2343,6 +2492,7 @@ const bindInteractions = () => {
     const editCommunity = event.target.closest('[data-edit-community]')
     const likeComment = event.target.closest('[data-like-comment]')
     const deleteComment = event.target.closest('[data-delete-comment]')
+    const deleteReply = event.target.closest('[data-delete-reply]')
     const replyComment = event.target.closest('[data-reply-comment]')
     const toggleReplies = event.target.closest('[data-toggle-replies]')
     const openLightbox = event.target.closest('[data-open-lightbox]')
@@ -2384,11 +2534,13 @@ const bindInteractions = () => {
       '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
-    if (openPen && !clickedAdminControl) {
+    const clickedLinkOrButton = event.target.closest('a, button, input, textarea, select, label')
+
+    if (openPen && !clickedAdminControl && !clickedLinkOrButton) {
       location.hash = `#/pen/${openPen.dataset.openPen}`
     }
 
-    if (openNews && !clickedAdminControl) {
+    if (openNews && !clickedAdminControl && !clickedLinkOrButton) {
       location.hash = `#/news/${openNews.dataset.openNews}`
     }
 
@@ -2527,6 +2679,20 @@ const bindInteractions = () => {
       const target = list.find((item) => item.id === commentId)
       if (!target || !canManageOwnedContent(target.nickname)) return
       state.comments[targetId] = list.filter((item) => item.id !== commentId)
+      saveComments()
+      render()
+    }
+
+    if (deleteReply) {
+      const targetId = deleteReply.dataset.targetId
+      const parentId = deleteReply.dataset.parentCommentId
+      const replyId = deleteReply.dataset.deleteReply
+      const list = state.comments[targetId] || []
+      const parent = list.find((item) => item.id === parentId)
+      if (!parent || !Array.isArray(parent.replies)) return
+      const targetReply = parent.replies.find((item) => item.id === replyId)
+      if (!targetReply || !canManageOwnedContent(targetReply.nickname)) return
+      parent.replies = parent.replies.filter((item) => item.id !== replyId)
       saveComments()
       render()
     }
@@ -3442,6 +3608,27 @@ export const bootstrapApp = async (rootEl) => {
   window.addEventListener('popstate', render)
 
   if (!location.hash) location.hash = '#/home'
+  await initNotificationConsent()
+  await maybeRunNotificationChecks()
+
+  if (USE_REMOTE_DB) {
+    window.setInterval(async () => {
+      if (!isNotificationOptedIn()) return
+      if (!canUseNotificationApi() || Notification.permission !== 'granted') return
+      try {
+        const [news, comments] = await Promise.all([
+          apiRequest('/api/state/news'),
+          apiRequest('/api/state/comments-map'),
+        ])
+        if (Array.isArray(news)) state.news = news
+        if (comments && typeof comments === 'object' && !Array.isArray(comments)) state.comments = comments
+        await maybeRunNotificationChecks()
+      } catch {
+        // ignore transient polling failures
+      }
+    }, 90000)
+  }
+
   render()
   registerServiceWorker()
 }
