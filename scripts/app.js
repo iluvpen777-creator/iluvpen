@@ -1246,7 +1246,7 @@ const renderCollection = (params) => {
   return `
   <section class="section reveal">
     <div class="section-head">
-      <h2>Collection Archive</h2>
+      <h2>Collection of i_luv_pen</h2>
       <p class="muted">Total ${filtered.length}</p>
     </div>
     <form class="filter-bar" data-collection-filter>
@@ -1590,35 +1590,6 @@ const renderAdmin = () => {
       </div></article>
 
       <article class="card"><div class="card-body">
-        <h3>Community Management (data/community.json)</h3>
-        <form class="admin-editor" data-admin-community>
-          <label>Select existing ID
-            <select name="pick"><option value="">New post</option>${state.community.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.id)}</option>`).join('')}</select>
-          </label>
-          <label>ID<input name="id" required /></label>
-          <label>Nickname<input name="nickname" required /></label>
-          <label>Title<input name="title" required /></label>
-          <label>Content<textarea name="content" rows="4" required></textarea></label>
-          <label>Image URL<input name="image" type="url" /></label>
-          <label>
-            Image file (optional)
-            <input name="imageFile" type="file" accept="image/*" hidden />
-            <div class="editor-actions file-picker">
-              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
-              <span class="muted" data-file-name>No file chosen</span>
-            </div>
-          </label>
-          <label>Likes<input name="likes" type="number" value="0" /></label>
-          <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
-          <label><input name="pinned" type="checkbox" /> Pin by admin</label>
-          <div class="editor-actions">
-            <button type="submit" class="btn">Add/Update + Commit</button>
-            <button type="button" class="btn ghost" data-admin-delete-community>Delete + Commit</button>
-          </div>
-        </form>
-      </div></article>
-
-      <article class="card"><div class="card-body">
         <h3>Comment Management (data/comments.json)</h3>
         <form class="admin-editor" data-admin-comments>
           <label>Target ID (e.g. news:slug, community:id)<input name="targetId" required /></label>
@@ -1935,7 +1906,6 @@ const bindInteractions = () => {
     const closeCompose = event.target.closest('[data-close-compose]')
     const deletePen = event.target.closest('[data-admin-delete-pen]')
     const deleteBlog = event.target.closest('[data-admin-delete-blog]')
-    const deleteCommunityByAdmin = event.target.closest('[data-admin-delete-community]')
     const deleteCommentByAdmin = event.target.closest('[data-admin-delete-comment]')
     const deletePenInline = event.target.closest('[data-admin-delete-pen-inline]')
     const deleteBlogInline = event.target.closest('[data-admin-delete-blog-inline]')
@@ -2210,22 +2180,6 @@ const bindInteractions = () => {
         .then((ok) => {
           if (ok) {
             alert('Blog post deleted and committed.')
-            render()
-          }
-        })
-        .catch((err) => alert(err.message))
-    }
-
-    if (deleteCommunityByAdmin) {
-      const form = deleteCommunityByAdmin.closest('[data-admin-community]')
-      const id = form?.id?.value?.trim()
-      if (!id) return
-      state.community = state.community.filter((c) => c.id !== id)
-      saveCommunity()
-      commitJsonToRepo('data/community.json', state.community, `admin: delete community ${id}`)
-        .then((ok) => {
-          if (ok) {
-            alert('Community post deleted and committed.')
             render()
           }
         })
@@ -2657,7 +2611,6 @@ const bindInteractions = () => {
     const repoForm = event.target.closest('[data-admin-repo-config]')
     const pensForm = event.target.closest('[data-admin-pens]')
     const blogsForm = event.target.closest('[data-admin-blogs]')
-    const adminCommunityForm = event.target.closest('[data-admin-community]')
     const adminCommentsForm = event.target.closest('[data-admin-comments]')
 
     if (repoForm) {
@@ -2718,33 +2671,6 @@ const bindInteractions = () => {
       const ok = await commitJsonToRepo('data/blog.json', state.blogs, `admin: upsert blog ${payload.slug}`)
       if (ok) {
         alert('Blog post saved and committed.')
-        render()
-      }
-      return
-    }
-
-    if (adminCommunityForm) {
-      event.preventDefault()
-      const image = await resolveImageInput(adminCommunityForm.image.value, adminCommunityForm.imageFile)
-      const payload = {
-        id: adminCommunityForm.id.value.trim(),
-        nickname: adminCommunityForm.nickname.value.trim(),
-        title: adminCommunityForm.title.value.trim(),
-        content: adminCommunityForm.content.value.trim(),
-        image,
-        likes: Number(adminCommunityForm.likes.value || 0),
-        pinned: adminCommunityForm.pinned.checked,
-        createdAt: adminCommunityForm.createdAt.value.trim() || new Date().toISOString(),
-      }
-      upsertBy(state.community, 'id', payload)
-      saveCommunity()
-      const ok = await commitJsonToRepo(
-        'data/community.json',
-        state.community,
-        `admin: upsert community ${payload.id}`,
-      )
-      if (ok) {
-        alert('Community post saved and committed.')
         render()
       }
       return
@@ -3020,7 +2946,6 @@ const ensureTestCommentsSeed = () => {
 const bindAdminEntityPickers = () => {
   const penForm = document.querySelector('[data-admin-pens]')
   const blogForm = document.querySelector('[data-admin-blogs]')
-  const communityForm = document.querySelector('[data-admin-community]')
 
   if (penForm) {
     penForm.pick.addEventListener('change', () => {
@@ -3058,25 +2983,6 @@ const bindAdminEntityPickers = () => {
       blogForm.readingTime.value = selected.readingTime || 5
       blogForm.content.value = selected.content || ''
       syncImagePreviewForForm(blogForm)
-    })
-  }
-
-  if (communityForm) {
-    communityForm.pick.addEventListener('change', () => {
-      const selected = state.community.find((c) => c.id === communityForm.pick.value)
-      if (!selected) {
-        communityForm.reset()
-        return
-      }
-      communityForm.id.value = selected.id
-      communityForm.nickname.value = selected.nickname
-      communityForm.title.value = selected.title
-      communityForm.content.value = selected.content
-      communityForm.image.value = selected.image || ''
-      communityForm.likes.value = selected.likes || 0
-      communityForm.createdAt.value = selected.createdAt || ''
-      communityForm.pinned.checked = !!selected.pinned
-      syncImagePreviewForForm(communityForm)
     })
   }
 
