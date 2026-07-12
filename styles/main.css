@@ -940,6 +940,14 @@ select:focus {
   padding-top: 12px;
 }
 
+.comment-composer-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
 .composer-actions {
   display: flex;
   justify-content: space-between;
@@ -1111,16 +1119,22 @@ select:focus {
 
   .site-header {
     top: 8px;
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 10px;
   }
 
   .site-header nav {
-    justify-content: center;
+    order: 3;
+    flex: 0 0 100%;
+    justify-content: flex-start;
   }
 
   .header-controls {
-    justify-content: center;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 
   .hero,

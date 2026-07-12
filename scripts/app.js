@@ -128,7 +128,11 @@ const renderMentionedText = (value = '') => {
     .replace(/\n/g, '<br />')
 }
 
-const renderUserAvatar = (nickname = '', size = 'md') => {
+const renderUserAvatar = (nickname = '', size = 'md', profileImage = '') => {
+  const safeImage = String(profileImage || '').trim()
+  if (safeImage) {
+    return `<img class="social-avatar ${size}" src="${escapeHtml(safeImage)}" alt="${escapeHtml(nickname)} profile" loading="lazy" />`
+  }
   const initial = (nickname.trim().charAt(0) || '?').toUpperCase()
   return `<span class="social-avatar ${size}" aria-hidden="true">${escapeHtml(initial)}</span>`
 }
@@ -318,6 +322,13 @@ const getLocalUserProfileImage = (nickname) => {
   if (!found) return ''
   const users = getLocalUsers()
   return users[found]?.profileImage || ''
+}
+
+const getProfileImageByNickname = (nickname = '') => {
+  if (!nickname) return ''
+  if (isProtectedAdminNickname(nickname)) return PROFILE_AVATAR_URL
+  if (isSameNickname(nickname, getNickname())) return getCurrentUserAvatar()
+  return getLocalUserProfileImage(nickname)
 }
 
 const getUserProfile = async (nickname) => {
@@ -675,18 +686,8 @@ const parseHashRoute = () => {
 }
 
 const applyTheme = () => {
-  const saved = localStorage.getItem(STORAGE_KEYS.theme)
-  const shouldDark = saved
-    ? saved === 'dark'
-    : window.matchMedia('(prefers-color-scheme: dark)').matches
-  document.documentElement.dataset.theme = shouldDark ? 'dark' : 'light'
-}
-
-const toggleTheme = () => {
-  const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
-  const next = current === 'dark' ? 'light' : 'dark'
-  document.documentElement.dataset.theme = next
-  localStorage.setItem(STORAGE_KEYS.theme, next)
+  document.documentElement.dataset.theme = 'light'
+  localStorage.removeItem(STORAGE_KEYS.theme)
 }
 
 const getComments = (targetId) => state.comments[targetId] || []
@@ -791,7 +792,7 @@ const renderCommentList = (targetId) => {
       (comment) => `<li class="comment-item">
           <div class="comment-head">
             <div class="comment-head-main">
-              ${renderUserAvatar(comment.nickname, 'sm')}
+              ${renderUserAvatar(comment.nickname, 'sm', comment.profileImage || getProfileImageByNickname(comment.nickname))}
               <div class="comment-meta"><strong>${escapeHtml(comment.nickname)}</strong><span>${formatDate(comment.createdAt)}</span></div>
             </div>
             <button data-like-comment="${comment.id}" type="button" class="text-btn comment-like-btn" aria-label="Like comment">
@@ -829,7 +830,7 @@ const renderCommentList = (targetId) => {
               <ul class="reply-list" data-replies-list="${targetId}:${comment.id}" hidden>${comment.replies
                   .map(
                     (reply) => `<li>
-                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs')}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div></div>
+                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div></div>
                       <p class="comment-text">${renderMentionedText(reply.content)}</p>
                     </li>`,
                   )
@@ -843,6 +844,7 @@ const renderCommentList = (targetId) => {
 
 const renderCommentComposer = (targetId) => `
   <form class="comment-form comment-composer" data-comment-form="${targetId}">
+    <div class="comment-composer-head">${renderUserAvatar(getNickname(), 'sm', getCurrentUserAvatar())}<span>${escapeHtml(getNickname() || 'Guest')}</span></div>
     <textarea name="comment" rows="2" required placeholder="Write a comment"></textarea>
     <div class="composer-actions">
       <button type="button" class="btn ghost" data-toggle-image-fields>Add image</button>
@@ -1596,7 +1598,6 @@ const renderHeader = () => `
           }</div>`
         : '<button type="button" class="btn ghost" data-pick-nickname>Create account</button>'
     }
-    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">Theme</button>
   </div>
 </header>
 `
@@ -1941,7 +1942,6 @@ const bindInteractions = () => {
     const deleteComment = event.target.closest('[data-delete-comment]')
     const replyComment = event.target.closest('[data-reply-comment]')
     const toggleReplies = event.target.closest('[data-toggle-replies]')
-    const toggleThemeBtn = event.target.closest('[data-toggle-theme]')
     const openLightbox = event.target.closest('[data-open-lightbox]')
     const adminPreview = event.target.closest('[data-admin-preview]')
     const adminLogout = event.target.closest('[data-admin-logout]')
@@ -1975,8 +1975,6 @@ const bindInteractions = () => {
       render()
       return
     }
-
-    if (toggleThemeBtn) toggleTheme()
 
     const clickedAdminControl = event.target.closest(
       '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
@@ -2401,6 +2399,7 @@ const bindInteractions = () => {
           parent.replies.push({
             id: uid(),
             nickname,
+            profileImage: getCurrentUserAvatar(),
             content,
             createdAt: new Date().toISOString(),
           })
@@ -2646,6 +2645,7 @@ const bindInteractions = () => {
       state.comments[targetId].unshift({
         id: uid(),
         nickname,
+        profileImage: getCurrentUserAvatar(),
         content,
         image: images.join('\n'),
         likes: 0,
