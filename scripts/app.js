@@ -1024,17 +1024,53 @@ const askAdminImageSource = (title, initialUrl = '') =>
     syncImagePreviewForForm(adminImageForm)
   })
 
-const renderPenCarousel = (pen) => {
+const renderImageCarousel = ({ id, images = [], alt = 'Image' }) => {
+  const validImages = images.filter(Boolean)
+  if (!validImages.length) {
+    return `<div class="carousel"><img src="" alt="${escapeHtml(alt)}" class="carousel-image" loading="lazy" /></div>`
+  }
+
+  const hasMultiple = validImages.length > 1
+
   return `
-  <div class="carousel" data-carousel-id="${pen.id}">
-    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">‹</button>
-    <img src="${pen.images[0]}" alt="${escapeHtml(pen.name)}" class="carousel-image" loading="lazy" data-carousel-image="${pen.id}" />
-    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">›</button>
-    <div class="dots">${pen.images
-      .map((_, idx) => `<button type="button" class="dot ${idx === 0 ? 'active' : ''}" data-carousel-dot="${pen.id}:${idx}" aria-label="Image ${idx + 1}"></button>`)
-      .join('')}</div>
+  <div class="carousel" data-carousel-id="${id}" data-carousel-images="${escapeHtml(validImages.join('\n'))}">
+    ${
+      hasMultiple
+        ? `<button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${id}">‹</button>`
+        : ''
+    }
+    <img src="${escapeHtml(validImages[0])}" alt="${escapeHtml(alt)}" class="carousel-image" loading="lazy" data-carousel-image="${id}" />
+    ${
+      hasMultiple
+        ? `<button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${id}">›</button>`
+        : ''
+    }
+    ${
+      hasMultiple
+        ? `<div class="dots">${validImages
+            .map(
+              (_, idx) =>
+                `<button type="button" class="dot ${idx === 0 ? 'active' : ''}" data-carousel-dot="${id}:${idx}" aria-label="Image ${idx + 1}"></button>`,
+            )
+            .join('')}</div>`
+        : ''
+    }
   </div>`
 }
+
+const renderPenCarousel = (pen) =>
+  renderImageCarousel({
+    id: pen.id,
+    images: pen.images,
+    alt: pen.name,
+  })
+
+const renderNewsThumbnailCarousel = (post, prefix = 'news-thumb') =>
+  renderImageCarousel({
+    id: `${prefix}-${post.slug}`,
+    images: parseImageValues(post.coverImage),
+    alt: post.title,
+  })
 
 const renderHome = () => {
   const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 4)
@@ -1095,7 +1131,7 @@ const renderHome = () => {
           return `<article class="card news-card home-placeholder"><div class="card-body"><h3>Coming Soon</h3><p class="meta">News update in progress</p></div></article>`
         }
         return `<article class="card news-card">
-          <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
+          ${renderNewsThumbnailCarousel(post, 'home-news')}
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
             <h3>${escapeHtml(post.title)}</h3>
@@ -1235,7 +1271,7 @@ const renderNewsList = () => {
     <div class="grid cards-2">${posts
       .map(
         (post) => `<article class="card news-card">
-          <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
+          ${renderNewsThumbnailCarousel(post, 'news-list')}
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
             <h3>${escapeHtml(post.title)}</h3>
@@ -1797,18 +1833,29 @@ const bindCarousel = () => {
     }
   }
 
-  const update = (id, nextIndex, direction = 1) => {
+  const getCarouselImages = (id) => {
+    const root = document.querySelector(`[data-carousel-id="${id}"]`)
+    if (root?.dataset?.carouselImages) {
+      const parsed = parseImageValues(root.dataset.carouselImages)
+      if (parsed.length) return parsed
+    }
+
     const pen = state.pens.find((item) => item.id === id)
-    if (!pen) return
+    return pen?.images || []
+  }
+
+  const update = (id, nextIndex, direction = 1) => {
+    const images = getCarouselImages(id)
+    if (!images.length) return
     const current = indexes.get(id) || 0
-    const safe = ((nextIndex % pen.images.length) + pen.images.length) % pen.images.length
+    const safe = ((nextIndex % images.length) + images.length) % images.length
     if (safe === current) return
     indexes.set(id, safe)
 
     const img = document.querySelector(`[data-carousel-image="${id}"]`)
     if (img) {
       animateImageSwap(img, direction, () => {
-        img.src = pen.images[safe]
+        img.src = images[safe]
       })
     }
 

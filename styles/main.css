@@ -427,10 +427,14 @@ main {
   line-height: 1.5;
 }
 
-.home-quad-grid .news-card img {
+.home-quad-grid .news-card .carousel-image {
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
+}
+
+.news-card .carousel-image {
+  aspect-ratio: 4 / 5;
 }
 
 .home-quad-grid .home-placeholder {
