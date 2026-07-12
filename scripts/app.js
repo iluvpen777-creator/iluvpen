@@ -132,6 +132,33 @@ const renderMentionedText = (value = '') => {
     .replace(/\n/g, '<br />')
 }
 
+const renderInlineMarkdown = (value = '') => {
+  let escaped = escapeHtml(String(value || ''))
+  const codeTokens = []
+
+  escaped = escaped.replace(/`([^`]+)`/g, (_match, code) => {
+    const token = `@@CODE_${codeTokens.length}@@`
+    codeTokens.push(`<code>${code}</code>`)
+    return token
+  })
+
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_match, label, url) => {
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+  })
+
+  escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  escaped = escaped.replace(/__([^_]+)__/g, '<strong>$1</strong>')
+  escaped = escaped.replace(/(^|[\s(])\*([^*]+)\*(?=[\s).,!?:;]|$)/g, '$1<em>$2</em>')
+  escaped = escaped.replace(/(^|[\s(])_([^_]+)_(?=[\s).,!?:;]|$)/g, '$1<em>$2</em>')
+  escaped = escaped.replace(/~~([^~]+)~~/g, '<del>$1</del>')
+
+  codeTokens.forEach((snippet, idx) => {
+    escaped = escaped.split(`@@CODE_${idx}@@`).join(snippet)
+  })
+
+  return escaped
+}
+
 const renderUserAvatar = (nickname = '', size = 'md', profileImage = '') => {
   const safeImage = String(profileImage || '').trim()
   if (safeImage) {
@@ -179,15 +206,15 @@ const markdownToHtml = (markdown = '') => {
     }
 
     if (line.startsWith('### ')) {
-      blocks.push(`<h3>${escapeHtml(line.slice(4))}</h3>`)
+      blocks.push(`<h3>${renderInlineMarkdown(line.slice(4))}</h3>`)
       continue
     }
     if (line.startsWith('## ')) {
-      blocks.push(`<h2>${escapeHtml(line.slice(3))}</h2>`)
+      blocks.push(`<h2>${renderInlineMarkdown(line.slice(3))}</h2>`)
       continue
     }
     if (line.startsWith('# ')) {
-      blocks.push(`<h1>${escapeHtml(line.slice(2))}</h1>`)
+      blocks.push(`<h1>${renderInlineMarkdown(line.slice(2))}</h1>`)
       continue
     }
     if (line.startsWith('- ')) {
@@ -195,10 +222,10 @@ const markdownToHtml = (markdown = '') => {
       if (!prev || !prev.endsWith('</ul>')) {
         blocks.push('<ul>')
       }
-      blocks.push(`<li>${escapeHtml(line.slice(2))}</li>`)
+      blocks.push(`<li>${renderInlineMarkdown(line.slice(2))}</li>`)
       continue
     }
-    blocks.push(`<p>${escapeHtml(line)}</p>`)
+    blocks.push(`<p>${renderInlineMarkdown(line)}</p>`)
   }
 
   // normalize list wrappers
