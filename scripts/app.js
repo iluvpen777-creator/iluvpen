@@ -1384,7 +1384,7 @@ const renderCollection = (params) => {
         </select>
       </label>
     </form>
-    <div class="grid cards-3">${filtered
+    <div class="grid home-quad-grid">${filtered
       .map(
         (pen) => `<article class="card pen-card" data-open-pen="${pen.id}">
           ${renderPenCarousel(pen)}
@@ -1456,7 +1456,7 @@ const renderNewsList = () => {
   return `
   <section class="section reveal">
     <div class="section-head"><h2>News</h2><p class="muted">Admin-managed publishing system</p>${isAdmin() ? '<a href="#/admin" class="btn ghost">Add</a>' : ''}</div>
-    <div class="grid cards-2">${posts
+    <div class="grid home-quad-grid">${posts
       .map(
         (post) => `<article class="card news-card">
           ${renderNewsThumbnailCarousel(post, 'news-list')}
