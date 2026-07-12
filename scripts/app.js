@@ -60,6 +60,7 @@ const state = {
   authModalOpen: false,
   authMode: 'login',
   accountManageMode: '',
+  notificationConsentModalOpen: false,
   userProfileImage: '',
 }
 
@@ -1021,16 +1022,7 @@ const maybeRunNotificationChecks = async () => {
 const initNotificationConsent = async () => {
   if (!canUseNotificationApi()) return
   if (localStorage.getItem(STORAGE_KEYS.notificationPromptSeen) === '1') return
-
-  localStorage.setItem(STORAGE_KEYS.notificationPromptSeen, '1')
-  const accepted = window.confirm('새 뉴스/멘션 알림을 받으시겠어요?')
-  if (!accepted) {
-    localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
-    return
-  }
-
-  const permission = await Notification.requestPermission()
-  localStorage.setItem(STORAGE_KEYS.notificationOptIn, permission === 'granted' ? 'true' : 'false')
+  state.notificationConsentModalOpen = true
 }
 
 const saveCommunity = () => {
@@ -2316,6 +2308,25 @@ const renderAccountManageModal = () => {
   `
 }
 
+const renderNotificationConsentModal = () => {
+  if (!state.notificationConsentModalOpen) return ''
+
+  return `
+  <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Notification consent">
+    <div class="compose-sheet consent-sheet">
+      <div class="section-head">
+        <h3>알림 설정</h3>
+      </div>
+      <p class="muted consent-copy">새 뉴스와 멘션 소식을 사이트 알림으로 받아볼까요?</p>
+      <div class="editor-actions">
+        <button type="button" class="btn" data-notification-consent="accept">동의하고 받기</button>
+        <button type="button" class="btn ghost" data-notification-consent="decline">지금은 안 받을게요</button>
+      </div>
+    </div>
+  </div>
+  `
+}
+
 const renderLayout = () => {
   const app = document.querySelector('#app')
   const params = new URLSearchParams(location.search)
@@ -2343,6 +2354,7 @@ const renderLayout = () => {
     </div>
     ${renderAuthModal()}
     ${renderAccountManageModal()}
+    ${renderNotificationConsentModal()}
   `)
 }
 
@@ -2523,6 +2535,34 @@ const bindInteractions = () => {
     const switchAuthMode = event.target.closest('[data-switch-auth-mode]')
     const openAccountManage = event.target.closest('[data-open-account-manage]')
     const closeAccountManage = event.target.closest('[data-close-account-manage]')
+    const notificationConsent = event.target.closest('[data-notification-consent]')
+
+    if (notificationConsent) {
+      const action = notificationConsent.dataset.notificationConsent
+      localStorage.setItem(STORAGE_KEYS.notificationPromptSeen, '1')
+
+      if (action === 'accept') {
+        Notification.requestPermission()
+          .then(async (permission) => {
+            localStorage.setItem(STORAGE_KEYS.notificationOptIn, permission === 'granted' ? 'true' : 'false')
+            state.notificationConsentModalOpen = false
+            if (permission === 'granted') {
+              await maybeRunNotificationChecks()
+            }
+            render()
+          })
+          .catch(() => {
+            localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
+            state.notificationConsentModalOpen = false
+            render()
+          })
+      } else {
+        localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
+        state.notificationConsentModalOpen = false
+        render()
+      }
+      return
+    }
 
     if (state.accountMenuOpen && !event.target.closest('.account-menu')) {
       state.accountMenuOpen = false
@@ -3609,7 +3649,9 @@ export const bootstrapApp = async (rootEl) => {
 
   if (!location.hash) location.hash = '#/home'
   await initNotificationConsent()
-  await maybeRunNotificationChecks()
+  if (!state.notificationConsentModalOpen) {
+    await maybeRunNotificationChecks()
+  }
 
   if (USE_REMOTE_DB) {
     window.setInterval(async () => {

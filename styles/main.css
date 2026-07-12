@@ -1151,6 +1151,14 @@ select:focus {
   overscroll-behavior: contain;
 }
 
+.consent-sheet {
+  width: min(520px, 100%);
+}
+
+.consent-copy {
+  margin: 8px 0 0;
+}
+
 .lightbox-inner {
   width: min(1100px, 100%);
   display: grid;
