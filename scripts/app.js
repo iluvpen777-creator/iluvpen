@@ -2171,7 +2171,7 @@ const renderHeader = () => `
                 </div>`
               : ''
           }</div>`
-        : '<button type="button" class="btn ghost" data-pick-nickname>Create account</button>'
+        : '<button type="button" class="btn ghost" data-pick-nickname>Login</button>'
     }
   </div>
 </header>
@@ -2647,7 +2647,7 @@ const bindInteractions = () => {
     }
 
     if (pickNickname) {
-      state.authMode = 'register'
+      state.authMode = 'login'
       state.authModalOpen = true
       state.accountMenuOpen = false
       render()
