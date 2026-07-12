@@ -2245,6 +2245,14 @@ const renderAccountManageModal = () => {
   if (!state.accountManageMode || !getNickname() || isCurrentProtectedAdmin()) return ''
 
   if (state.accountManageMode === 'settings') {
+    const notificationSupported = canUseNotificationApi()
+    const notificationEnabled = isNotificationOptedIn() && (!notificationSupported || Notification.permission === 'granted')
+    const notificationStatus = notificationSupported
+      ? Notification.permission === 'denied'
+        ? 'Browser notification permission is blocked. Enable it in browser settings to turn notifications on.'
+        : 'Receive notifications for new articles and community updates.'
+      : 'This browser does not support notifications.'
+
     return `
     <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Account settings">
       <div class="compose-sheet">
@@ -2257,6 +2265,11 @@ const renderAccountManageModal = () => {
             Nickname (read-only)
             <input value="${escapeHtml(getNickname())}" readonly disabled />
           </label>
+          <label>
+            Enable notifications
+            <input name="notificationEnabled" type="checkbox" ${notificationEnabled ? 'checked' : ''} ${notificationSupported ? '' : 'disabled'} />
+          </label>
+          <p class="muted">${escapeHtml(notificationStatus)}</p>
           <label>
             Image URL (optional)
             <input name="imageUrl" type="url" placeholder="https://..." />
@@ -3102,6 +3115,7 @@ const bindInteractions = () => {
       const password = accountSettingsForm.password.value
       const newPassword = accountSettingsForm.newPassword.value
       const newPasswordConfirm = accountSettingsForm.newPasswordConfirm.value
+      const requestedNotificationEnabled = Boolean(accountSettingsForm.notificationEnabled?.checked)
       const profileImage = await resolveImageInput(
         accountSettingsForm.imageUrl.value,
         accountSettingsForm.imageFile,
@@ -3123,9 +3137,26 @@ const bindInteractions = () => {
         if (newPassword) {
           await updateUserPassword({ nickname, password, newPassword })
         }
+
+        let notificationMessage = ''
+        if (canUseNotificationApi()) {
+          localStorage.setItem(STORAGE_KEYS.notificationPromptSeen, '1')
+          if (requestedNotificationEnabled) {
+            const permission = Notification.permission === 'granted' ? 'granted' : await requestNotificationPermissionSafe()
+            const enabled = permission === 'granted'
+            localStorage.setItem(STORAGE_KEYS.notificationOptIn, enabled ? 'true' : 'false')
+            if (!enabled) {
+              notificationMessage = ' Notifications could not be enabled because browser permission is not granted.'
+            }
+          } else {
+            localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
+          }
+        }
+
         state.userProfileImage = result.profileImage || ''
         state.accountManageMode = ''
-        alert(newPassword ? 'Profile photo and password updated.' : 'Profile photo updated.')
+        const baseMessage = newPassword ? 'Profile photo and password updated.' : 'Profile photo updated.'
+        alert(`${baseMessage} Notification setting saved.${notificationMessage}`)
         render()
       } catch (error) {
         alert(error.message || 'Failed to update account settings.')
