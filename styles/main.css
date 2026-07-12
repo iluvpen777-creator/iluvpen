@@ -599,6 +599,13 @@ main {
   background: var(--card);
 }
 
+.card,
+.list-item,
+.board-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 260px;
+}
+
 .social-post {
   border-radius: 16px;
   padding: 16px;
@@ -1178,6 +1185,28 @@ select:focus {
     justify-content: space-between;
     flex-wrap: wrap;
     row-gap: 10px;
+    backdrop-filter: none;
+  }
+
+  .page-enter,
+  .reveal {
+    animation: none;
+  }
+
+  .section,
+  .card,
+  .social-post,
+  .comment-image,
+  .social-post .community-image {
+    box-shadow: none;
+  }
+
+  .carousel-image {
+    transition: none;
+  }
+
+  .carousel:hover .carousel-image {
+    transform: none;
   }
 
   .site-header nav {

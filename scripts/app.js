@@ -740,15 +740,45 @@ const apiRequest = async (path, options = {}) => {
   return response.json()
 }
 
+let keyboardInsetFrame = 0
+let lastKeyboardOffset = ''
+
+const shouldTrackKeyboardInset = () => {
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement)) return false
+  if (!active.matches('input, textarea, select, [contenteditable="true"]')) return false
+  if (active.matches('input[type="file"], input[type="hidden"]')) return false
+  return true
+}
+
 const updateKeyboardInset = () => {
   const viewport = window.visualViewport
+  const root = document.documentElement
+
   if (!viewport) {
-    document.documentElement.style.setProperty('--keyboard-offset', '0px')
+    if (lastKeyboardOffset !== '0px') {
+      root.style.setProperty('--keyboard-offset', '0px')
+      lastKeyboardOffset = '0px'
+    }
     return
   }
 
-  const keyboardHeight = Math.max(0, window.innerHeight - (viewport.height + viewport.offsetTop))
-  document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardHeight)}px`)
+  const keyboardHeight = shouldTrackKeyboardInset()
+    ? Math.max(0, window.innerHeight - (viewport.height + viewport.offsetTop))
+    : 0
+  const nextOffset = `${Math.round(keyboardHeight)}px`
+
+  if (nextOffset === lastKeyboardOffset) return
+  root.style.setProperty('--keyboard-offset', nextOffset)
+  lastKeyboardOffset = nextOffset
+}
+
+const scheduleKeyboardInsetUpdate = () => {
+  if (keyboardInsetFrame) return
+  keyboardInsetFrame = window.requestAnimationFrame(() => {
+    keyboardInsetFrame = 0
+    updateKeyboardInset()
+  })
 }
 
 const keepFocusedFieldVisible = (target) => {
@@ -3261,13 +3291,18 @@ export const bootstrapApp = async (rootEl) => {
 
   bindCarousel()
   bindInteractions()
-  updateKeyboardInset()
+  scheduleKeyboardInsetUpdate()
 
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', updateKeyboardInset)
-    window.visualViewport.addEventListener('scroll', updateKeyboardInset)
+    window.visualViewport.addEventListener('resize', scheduleKeyboardInsetUpdate)
+    window.visualViewport.addEventListener('scroll', () => {
+      if (!shouldTrackKeyboardInset()) return
+      scheduleKeyboardInsetUpdate()
+    })
   }
-  window.addEventListener('orientationchange', updateKeyboardInset)
+  window.addEventListener('orientationchange', scheduleKeyboardInsetUpdate)
+  document.addEventListener('focusin', scheduleKeyboardInsetUpdate, true)
+  document.addEventListener('focusout', scheduleKeyboardInsetUpdate, true)
 
   window.addEventListener('hashchange', render)
   window.addEventListener('popstate', render)
