@@ -215,7 +215,7 @@ main {
 .hero.hero-feature {
   min-height: min(68vh, 540px);
   padding: clamp(20px, 4vw, 34px);
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   position: relative;
   overflow: hidden;
@@ -232,6 +232,7 @@ main {
   content: '';
   position: absolute;
   inset: -2px;
+  border-radius: inherit;
   z-index: 0;
   pointer-events: none;
   background:
