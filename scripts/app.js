@@ -1442,9 +1442,9 @@ const renderCommunityDetail = (postId) => {
           <label class="comment-sort-label">
             Sort
             <select data-comment-sort="community:${post.id}">
-              <option value="oldest" ${getCommentSort(`community:${post.id}`) === 'oldest' ? 'selected' : ''}>등록순</option>
-              <option value="latest" ${getCommentSort(`community:${post.id}`) === 'latest' ? 'selected' : ''}>최신순</option>
-              <option value="likes" ${getCommentSort(`community:${post.id}`) === 'likes' ? 'selected' : ''}>좋아요 많은 순</option>
+              <option value="oldest" ${getCommentSort(`community:${post.id}`) === 'oldest' ? 'selected' : ''}>Oldest</option>
+              <option value="latest" ${getCommentSort(`community:${post.id}`) === 'latest' ? 'selected' : ''}>Newest</option>
+              <option value="likes" ${getCommentSort(`community:${post.id}`) === 'likes' ? 'selected' : ''}>Most liked</option>
             </select>
           </label>
         </div>
