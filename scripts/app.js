@@ -1529,6 +1529,19 @@ const renderAdmin = () => {
   <section class="section reveal">
     <div class="section-head"><h2>Admin Panel</h2><button type="button" class="btn ghost" data-admin-logout>Sign out</button></div>
 
+    <article class="card" style="margin-bottom: 14px;"><div class="card-body">
+      <h3>Repository Settings (required for commit)</h3>
+      <form class="admin-editor" data-admin-repo-config>
+        <label>Owner<input name="owner" value="${escapeHtml(state.repoConfig.owner || '')}" placeholder="iluvpen777-creator" required /></label>
+        <label>Repository<input name="repo" value="${escapeHtml(state.repoConfig.repo || '')}" placeholder="iluvpen" required /></label>
+        <label>Branch<input name="branch" value="${escapeHtml(state.repoConfig.branch || 'main')}" placeholder="main" required /></label>
+        <label>GitHub Token<input name="token" type="password" value="${escapeHtml(state.repoConfig.token || '')}" placeholder="ghp_xxx" required /></label>
+        <div class="editor-actions">
+          <button type="submit" class="btn">Save Repository Settings</button>
+        </div>
+      </form>
+    </div></article>
+
     <div class="grid cards-2">
       <article class="card"><div class="card-body">
         <h3>Collection Management (data/pens.json)</h3>
