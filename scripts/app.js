@@ -1341,9 +1341,7 @@ const renderNewsThumbnailCarousel = (post, prefix = 'news-thumb') =>
 
 const renderHome = () => {
   const latestPens = [...state.pens].sort((a, b) => b.year - a.year).slice(0, 4)
-  const newestCollectionPen = [...state.pens].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-  )[0]
+  const newestCollectionPen = [...state.pens].sort((a, b) => b.year - a.year || new Date(b.createdAt) - new Date(a.createdAt))[0]
   const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
