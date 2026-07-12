@@ -1029,9 +1029,11 @@ const maybeRunNotificationChecks = async () => {
   await maybeNotifyMentions()
 }
 
-const initNotificationConsent = async () => {
+const initNotificationConsent = async ({ justLoggedIn = false } = {}) => {
   if (!canUseNotificationApi()) return
-  if (localStorage.getItem(STORAGE_KEYS.notificationPromptSeen) === '1') return
+  if (!justLoggedIn) return
+  if (!getNickname()) return
+  if (isNotificationOptedIn()) return
   state.notificationConsentModalOpen = true
 }
 
@@ -3071,6 +3073,7 @@ const bindInteractions = () => {
         state.userProfileImage = result.profileImage || ''
         state.authModalOpen = false
         state.authMode = 'login'
+        await initNotificationConsent({ justLoggedIn: true })
         alert('Account created and logged in.')
         render()
       } catch (error) {
@@ -3099,6 +3102,7 @@ const bindInteractions = () => {
         state.userProfileImage = result.profileImage || ''
         state.authModalOpen = false
         state.authMode = 'login'
+        await initNotificationConsent({ justLoggedIn: true })
         alert('Logged in.')
         render()
       } catch (error) {
@@ -3684,10 +3688,7 @@ export const bootstrapApp = async (rootEl) => {
   window.addEventListener('popstate', render)
 
   if (!location.hash) location.hash = '#/home'
-  await initNotificationConsent()
-  if (!state.notificationConsentModalOpen) {
-    await maybeRunNotificationChecks()
-  }
+  await maybeRunNotificationChecks()
 
   if (USE_REMOTE_DB) {
     window.setInterval(async () => {
