@@ -984,6 +984,20 @@ const renderCommentList = (targetId) => {
     .join('')}</ul>`
 }
 
+const syncCommentLikeUi = (button, liked, likes) => {
+  if (!(button instanceof HTMLElement)) return
+  const icon = button.querySelector('.comment-like-icon')
+  if (icon) {
+    icon.classList.toggle('liked', liked)
+    icon.innerHTML = liked ? '&#9829;' : '&#9825;'
+  }
+  const item = button.closest('.comment-item')
+  const counter = item?.querySelector('.comment-like-count')
+  if (counter) {
+    counter.textContent = `Likes ${likes}`
+  }
+}
+
 const renderCommentComposer = (targetId) => `
   <form class="comment-form comment-composer" data-comment-form="${targetId}">
     <div class="comment-composer-head">${renderUserAvatar(getNickname(), 'sm', getCurrentUserAvatar())}<span>${escapeHtml(getNickname() || 'Guest')}</span></div>
@@ -1255,6 +1269,10 @@ const askAdminImagesSource = (title, initialValue = '') =>
             <label class="admin-image-select-row"><input type="checkbox" data-admin-image-select="${idx}" ${selectedIndexes.has(idx) ? 'checked' : ''} /> Select image ${idx + 1}</label>
             <img src="${escapeHtml(image)}" alt="Selected cover image ${idx + 1}" loading="lazy" />
             <p class="muted admin-image-source">${escapeHtml(getImageLabel(image, idx))}</p>
+            <div class="admin-inline-actions">
+              <button type="button" class="text-btn" data-admin-move-current-image="${idx}:up">Move up</button>
+              <button type="button" class="text-btn" data-admin-move-current-image="${idx}:down">Move down</button>
+            </div>
           </li>`,
         )
         .join('')
@@ -1283,6 +1301,21 @@ const askAdminImagesSource = (title, initialValue = '') =>
       if (input.checked) selectedIndexes.add(idx)
       else selectedIndexes.delete(idx)
       renderCurrentImageList()
+    })
+
+    currentList.addEventListener('click', (event) => {
+      const moveButton = event.target.closest('[data-admin-move-current-image]')
+      if (!moveButton) return
+      const [idxRaw, direction] = moveButton.dataset.adminMoveCurrentImage.split(':')
+      const idx = Number(idxRaw)
+      if (!Number.isInteger(idx) || idx < 0) return
+      const images = getCurrentImages()
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (!moveArrayItem(images, idx, targetIdx)) return
+      form.images.value = images.join('\n')
+      selectedIndexes.clear()
+      renderCurrentImageList()
+      syncImagePreviewForForm(form)
     })
 
     selectAllButton.addEventListener('click', () => {
@@ -1545,7 +1578,7 @@ const renderPenDetail = (id) => {
               ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
           <ul class="admin-photo-list">${pen.images
             .map(
-              (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></li>`,
+              (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:up">Move up</button><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:down">Move down</button><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></div></li>`,
             )
             .join('')}</ul>`
               : ''
@@ -2272,6 +2305,7 @@ const bindInteractions = () => {
     const editNewsCoverInline = event.target.closest('[data-admin-edit-news-cover-inline]')
     const addPenImage = event.target.closest('[data-admin-add-pen-image]')
     const deletePenImage = event.target.closest('[data-admin-delete-pen-image]')
+    const movePenImage = event.target.closest('[data-admin-move-pen-image]')
     const adminOpen = event.target.closest('[data-admin-open]')
     const toggleCommunityPin = event.target.closest('[data-admin-toggle-pin-community]')
     const pickFile = event.target.closest('[data-pick-file]')
@@ -2291,7 +2325,7 @@ const bindInteractions = () => {
     }
 
     const clickedAdminControl = event.target.closest(
-      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
     if (openPen && !clickedAdminControl) {
@@ -2419,8 +2453,8 @@ const bindInteractions = () => {
         if (comment) {
           const nowLiked = toggleLikeMark('comments', comment.id)
           comment.likes = Math.max(0, Number(comment.likes || 0) + (nowLiked ? 1 : -1))
+          syncCommentLikeUi(likeComment, nowLiked, comment.likes)
           saveComments()
-          render()
           break
         }
       }
@@ -2653,6 +2687,19 @@ const bindInteractions = () => {
       savePen()
       alert('Photo deleted.')
       render()
+    }
+
+    if (movePenImage) {
+      if (!isAdmin()) return
+      const [id, idxRaw, direction] = movePenImage.dataset.adminMovePenImage.split(':')
+      const idx = Number(idxRaw)
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen || !Array.isArray(pen.images) || !pen.images[idx]) return
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (!moveArrayItem(pen.images, idx, targetIdx)) return
+      savePen()
+      render()
+      return
     }
 
     if (toggleCommunityPin) {
@@ -3109,6 +3156,17 @@ const upsertBy = (list, key, item) => {
   const idx = list.findIndex((x) => x[key] === item[key])
   if (idx >= 0) list[idx] = item
   else list.unshift(item)
+}
+
+const moveArrayItem = (list, from, to) => {
+  if (!Array.isArray(list) || !list.length) return false
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return false
+  if (from < 0 || from >= list.length) return false
+  if (to < 0 || to >= list.length) return false
+  if (from === to) return false
+  const [picked] = list.splice(from, 1)
+  list.splice(to, 0, picked)
+  return true
 }
 
 const ensureTestCommentsSeed = () => {
