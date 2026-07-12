@@ -1085,6 +1085,18 @@ select:focus {
   object-fit: cover;
 }
 
+.admin-image-select-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
+.admin-image-source {
+  word-break: break-all;
+  margin: 0;
+}
+
 .lightbox {
   position: fixed;
   inset: 0;

@@ -1153,6 +1153,14 @@ const askAdminImagesSource = (title, initialValue = '') =>
             Cover image URLs (optional, one per line)
             <textarea name="images" rows="5" placeholder="https://...">${escapeHtml(initialValue)}</textarea>
           </label>
+          <div>
+            <p class="muted">Current cover images (select and delete specific items)</p>
+            <ul class="admin-photo-list" data-admin-current-images-list></ul>
+            <div class="editor-actions">
+              <button type="button" class="btn ghost" data-admin-select-all-images>Select all</button>
+              <button type="button" class="btn ghost" data-admin-delete-selected-images>Delete selected</button>
+            </div>
+          </div>
           <label>
             Cover image files (optional)
             <input name="imageFile" type="file" accept="image/*" multiple hidden />
@@ -1184,6 +1192,47 @@ const askAdminImagesSource = (title, initialValue = '') =>
     const fileName = modal.querySelector('[data-admin-images-file-name]')
     const picker = modal.querySelector('[data-pick-admin-images-file]')
     const form = modal.querySelector('[data-admin-images-form]')
+    const currentList = modal.querySelector('[data-admin-current-images-list]')
+    const selectAllButton = modal.querySelector('[data-admin-select-all-images]')
+    const deleteSelectedButton = modal.querySelector('[data-admin-delete-selected-images]')
+    const selectedIndexes = new Set()
+
+    const getCurrentImages = () => parseImageValues(form.images.value)
+
+    const getImageLabel = (value, index) => {
+      if (value.startsWith('data:image/')) {
+        return `Image ${index + 1} (data URL)`
+      }
+      return `Image ${index + 1}: ${value}`
+    }
+
+    const renderCurrentImageList = () => {
+      const images = getCurrentImages()
+      for (const idx of [...selectedIndexes]) {
+        if (idx >= images.length) selectedIndexes.delete(idx)
+      }
+
+      if (!images.length) {
+        currentList.innerHTML = '<li><p class="muted">No cover images currently listed.</p></li>'
+        selectAllButton.disabled = true
+        deleteSelectedButton.disabled = true
+        return
+      }
+
+      currentList.innerHTML = images
+        .map(
+          (image, idx) => `<li>
+            <label class="admin-image-select-row"><input type="checkbox" data-admin-image-select="${idx}" ${selectedIndexes.has(idx) ? 'checked' : ''} /> Select image ${idx + 1}</label>
+            <img src="${escapeHtml(image)}" alt="Selected cover image ${idx + 1}" loading="lazy" />
+            <p class="muted admin-image-source">${escapeHtml(getImageLabel(image, idx))}</p>
+          </li>`,
+        )
+        .join('')
+
+      selectAllButton.disabled = false
+      deleteSelectedButton.disabled = selectedIndexes.size === 0
+      selectAllButton.textContent = selectedIndexes.size === images.length ? 'Clear selection' : 'Select all'
+    }
 
     picker.addEventListener('click', () => fileInput.click())
     fileInput.addEventListener('change', () => {
@@ -1191,6 +1240,42 @@ const askAdminImagesSource = (title, initialValue = '') =>
       syncImagePreviewForForm(form)
     })
     form.images.addEventListener('input', () => {
+      selectedIndexes.clear()
+      renderCurrentImageList()
+      syncImagePreviewForForm(form)
+    })
+
+    currentList.addEventListener('change', (event) => {
+      const input = event.target.closest('input[data-admin-image-select]')
+      if (!input) return
+      const idx = Number(input.dataset.adminImageSelect)
+      if (!Number.isInteger(idx) || idx < 0) return
+      if (input.checked) selectedIndexes.add(idx)
+      else selectedIndexes.delete(idx)
+      renderCurrentImageList()
+    })
+
+    selectAllButton.addEventListener('click', () => {
+      const images = getCurrentImages()
+      if (!images.length) return
+      if (selectedIndexes.size === images.length) {
+        selectedIndexes.clear()
+      } else {
+        selectedIndexes.clear()
+        for (let idx = 0; idx < images.length; idx += 1) {
+          selectedIndexes.add(idx)
+        }
+      }
+      renderCurrentImageList()
+    })
+
+    deleteSelectedButton.addEventListener('click', () => {
+      const images = getCurrentImages()
+      if (!images.length || !selectedIndexes.size) return
+      const next = images.filter((_image, idx) => !selectedIndexes.has(idx))
+      form.images.value = next.join('\n')
+      selectedIndexes.clear()
+      renderCurrentImageList()
       syncImagePreviewForForm(form)
     })
 
@@ -1202,6 +1287,7 @@ const askAdminImagesSource = (title, initialValue = '') =>
     })
 
     document.body.append(modal)
+    renderCurrentImageList()
     syncImagePreviewForForm(form)
   })
 
