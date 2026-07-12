@@ -853,6 +853,28 @@ const applyTheme = () => {
 }
 
 const getComments = (targetId) => state.comments[targetId] || []
+
+const getCommentThreadCount = (targetId) => {
+  const comments = getComments(targetId)
+  return comments.reduce((total, comment) => total + 1 + (Array.isArray(comment.replies) ? comment.replies.length : 0), 0)
+}
+
+const findCommentEntityById = (commentId) => {
+  for (const [targetId, list] of Object.entries(state.comments || {})) {
+    for (const comment of list || []) {
+      if (comment.id === commentId) {
+        return { targetId, entity: comment, kind: 'comment' }
+      }
+      for (const reply of comment.replies || []) {
+        if (reply.id === commentId) {
+          return { targetId, entity: reply, kind: 'reply' }
+        }
+      }
+    }
+  }
+  return null
+}
+
 const isAdmin = () => {
   const adminFlag = localStorage.getItem(STORAGE_KEYS.admin) === 'true'
   return adminFlag && isCurrentProtectedAdmin()
@@ -1091,9 +1113,7 @@ const getSortedCommunity = (sort) => {
   const arr = [...state.community]
   if (sort === 'popular') return arr.sort((a, b) => b.likes - a.likes)
   if (sort === 'comments') {
-    return arr.sort(
-      (a, b) => getComments(`community:${b.id}`).length - getComments(`community:${a.id}`).length,
-    )
+    return arr.sort((a, b) => getCommentThreadCount(`community:${b.id}`) - getCommentThreadCount(`community:${a.id}`))
   }
   return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
@@ -1166,12 +1186,14 @@ const renderCommentList = (targetId) => {
               <ul class="reply-list" data-replies-list="${targetId}:${comment.id}" hidden>${comment.replies
                   .map(
                     (reply) => `<li>
-                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div></div>
+                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div><button data-like-comment="${reply.id}" type="button" class="text-btn comment-like-btn" aria-label="Like reply"><span class="comment-like-icon ${hasLiked('comments', reply.id) ? 'liked' : ''}" aria-hidden="true">${
+                        hasLiked('comments', reply.id) ? '&#9829;' : '&#9825;'
+                      }</span></button></div>
                       <p class="comment-text">${renderMentionedText(reply.content)}</p>
                       ${
                         canManageOwnedContent(reply.nickname)
-                          ? `<div class="comment-actions"><button data-delete-reply="${reply.id}" data-parent-comment-id="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button></div>`
-                          : ''
+                          ? `<div class="comment-actions"><span class="comment-like-count">Likes ${Number(reply.likes || 0)}</span><button data-delete-reply="${reply.id}" data-parent-comment-id="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button></div>`
+                          : `<div class="comment-actions"><span class="comment-like-count">Likes ${Number(reply.likes || 0)}</span></div>`
                       }
                     </li>`,
                   )
@@ -1190,7 +1212,7 @@ const syncCommentLikeUi = (button, liked, likes) => {
     icon.classList.toggle('liked', liked)
     icon.innerHTML = liked ? '&#9829;' : '&#9825;'
   }
-  const item = button.closest('.comment-item')
+  const item = button.closest('li')
   const counter = item?.querySelector('.comment-like-count')
   if (counter) {
     counter.textContent = `Likes ${likes}`
@@ -1693,7 +1715,7 @@ const renderHome = () => {
         (post) => `<article class="list-item">
           <h3>${escapeHtml(post.title)}</h3>
           <p>${escapeHtml(post.content.slice(0, 130))}...</p>
-          <p class="meta">${escapeHtml(post.nickname)} · Likes ${post.likes} · Comments ${getComments(`community:${post.id}`).length}</p>
+          <p class="meta">${escapeHtml(post.nickname)} · Likes ${post.likes} · Comments ${getCommentThreadCount(`community:${post.id}`)}</p>
         </article>`,
       )
       .join('')}</div>
@@ -1903,7 +1925,7 @@ const renderCommunityBoard = (params) => {
                 ? `<img src="${escapeHtml(getFirstImageValue(post.image))}" alt="Post thumbnail" class="board-thumb" loading="lazy" />`
                 : ''
             }
-            <span class="board-title">${escapeHtml(post.title)} <em class="board-count">[${getComments(`community:${post.id}`).length}]</em></span>
+            <span class="board-title">${escapeHtml(post.title)} <em class="board-count">[${getCommentThreadCount(`community:${post.id}`)}]</em></span>
           </span>
           <span class="board-author">${renderUserAvatar(post.nickname, 'xs', post.profileImage || getProfileImageByNickname(post.nickname))}${escapeHtml(post.nickname)}</span>
           <span class="board-time">${formatDate(post.createdAt)}</span>
@@ -1952,7 +1974,7 @@ const renderCommunityDetail = (postId) => {
       </div>
       <div class="comment-block">
         <div class="comment-block-head">
-          <h4>Comments ${getComments(`community:${post.id}`).length}</h4>
+          <h4>Comments ${getCommentThreadCount(`community:${post.id}`)}</h4>
           <label class="comment-sort-label">
             Sort
             <select data-comment-sort="community:${post.id}">
@@ -2720,16 +2742,12 @@ const bindInteractions = () => {
     if (likeComment) {
       const nickname = ensureNickname()
       if (!nickname) return
-      for (const key of Object.keys(state.comments)) {
-        const comment = state.comments[key].find((item) => item.id === likeComment.dataset.likeComment)
-        if (comment) {
-          const nowLiked = toggleLikeMark('comments', comment.id)
-          comment.likes = Math.max(0, Number(comment.likes || 0) + (nowLiked ? 1 : -1))
-          syncCommentLikeUi(likeComment, nowLiked, comment.likes)
-          saveCommentLike(comment.id, comment.likes)
-          break
-        }
-      }
+      const target = findCommentEntityById(likeComment.dataset.likeComment)
+      if (!target) return
+      const nowLiked = toggleLikeMark('comments', target.entity.id)
+      target.entity.likes = Math.max(0, Number(target.entity.likes || 0) + (nowLiked ? 1 : -1))
+      syncCommentLikeUi(likeComment, nowLiked, target.entity.likes)
+      saveCommentLike(target.entity.id, target.entity.likes)
     }
 
     if (deleteComment) {
@@ -3039,6 +3057,7 @@ const bindInteractions = () => {
             nickname,
             profileImage: getCurrentUserAvatar(),
             content,
+            likes: 0,
             createdAt: new Date().toISOString(),
           })
           saveComments()
