@@ -1304,7 +1304,7 @@ const renderNewsDetail = (slug) => {
       <h1>${escapeHtml(post.title)}</h1>
       <p class="lead">${escapeHtml(post.subtitle)}</p>
       <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min read</p>
-      <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" class="article-cover" />
+      <img src="${escapeHtml(getFirstImageValue(post.coverImage))}" alt="${escapeHtml(post.title)}" class="article-cover" />
       <div class="article-content">${markdownToHtml(post.content)}</div>
       <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
       ${
@@ -2301,11 +2301,20 @@ const bindInteractions = () => {
       const slug = editNewsCoverInline.dataset.adminEditNewsCoverInline
       const post = state.news.find((b) => b.slug === slug)
       if (!post) return
-      askAdminImageSource('Edit cover photo', post.coverImage || '').then((image) => {
-        if (!image) return
-        post.coverImage = image.trim()
+      askAdminFields('Edit cover photos', [
+        {
+          name: 'coverImage',
+          label: 'Cover image URLs (one per line)',
+          value: post.coverImage || '',
+          multiline: true,
+          rows: 5,
+        },
+      ]).then((values) => {
+        const images = parseImageValues(values?.coverImage || '')
+        if (!images.length) return
+        post.coverImage = images.join('\n')
         saveNews()
-        alert('News cover photo updated.')
+        alert('News cover photos updated.')
         render()
       })
       return
@@ -2560,7 +2569,7 @@ const bindInteractions = () => {
     if (newsForm) {
       event.preventDefault()
       const coverImages = await resolveImageInputs(newsForm.coverImage.value, newsForm.imageFile)
-      const coverImage = coverImages[0] || ''
+      const coverImage = coverImages.join('\n')
       const payload = {
         slug: newsForm.slug.value.trim(),
         title: newsForm.title.value.trim(),
