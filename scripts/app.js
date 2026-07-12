@@ -1027,9 +1027,9 @@ const askAdminImageSource = (title, initialUrl = '') =>
 const renderPenCarousel = (pen) => {
   return `
   <div class="carousel" data-carousel-id="${pen.id}">
+    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">‹</button>
     <img src="${pen.images[0]}" alt="${escapeHtml(pen.name)}" class="carousel-image" loading="lazy" data-carousel-image="${pen.id}" />
-    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">??/button>
-    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">??/button>
+    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">›</button>
     <div class="dots">${pen.images
       .map((_, idx) => `<button type="button" class="dot ${idx === 0 ? 'active' : ''}" data-carousel-dot="${pen.id}:${idx}" aria-label="Image ${idx + 1}"></button>`)
       .join('')}</div>
@@ -1045,8 +1045,8 @@ const renderHome = () => {
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
   return `
-  <section class="hero reveal">
-    <div>
+  <section class="hero hero-feature reveal" ${newestCollectionPen?.images?.[0] ? `style="--hero-image: url('${escapeHtml(newestCollectionPen.images[0])}')"` : ''}>
+    <div class="hero-content">
       <p class="eyebrow">Premium Archive</p>
       <h1>i_luv_pen</h1>
       <p class="lead">collection, news, community by james koh</p>
@@ -1055,10 +1055,7 @@ const renderHome = () => {
         <a class="btn ghost" href="#/news">Latest News</a>
       </div>
     </div>
-    <figure class="hero-figure">
-      <img src="${newestCollectionPen?.images?.[0] || ''}" alt="Featured fountain pen" loading="eager" />
-      <figcaption>${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</figcaption>
-    </figure>
+    <p class="hero-caption">${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</p>
   </section>
 
   <section class="section reveal">

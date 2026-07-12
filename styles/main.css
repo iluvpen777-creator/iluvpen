@@ -207,6 +207,38 @@ main {
   align-items: center;
 }
 
+.hero.hero-feature {
+  min-height: min(68vh, 540px);
+  padding: clamp(20px, 4vw, 34px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--card);
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.88) 34%,
+      rgba(255, 255, 255, 0.56) 56%,
+      rgba(255, 255, 255, 0.12) 76%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    var(--hero-image);
+  background-size: cover;
+  background-position: center;
+  align-content: space-between;
+}
+
+.hero-content {
+  max-width: min(60ch, 62%);
+}
+
+.hero-caption {
+  margin: 0;
+  color: color-mix(in oklab, var(--muted), #4f3a2a 18%);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .hero h1 {
   font-size: clamp(2.2rem, 5vw, 4rem);
   margin: 4px 0 14px;
@@ -394,16 +426,13 @@ main {
 .carousel {
   position: relative;
   overflow: hidden;
-  touch-action: pan-y;
 }
 
 .carousel-image {
-  position: relative;
-  z-index: 1;
   width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
-  transition: transform 0.35s ease, opacity 0.2s ease;
+  transition: transform 0.35s ease;
 }
 
 .pen-card .carousel-image {
@@ -424,29 +453,14 @@ main {
   height: 36px;
   border-radius: 50%;
   cursor: pointer;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  line-height: 1;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
-  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.carousel-nav:hover,
-.carousel-nav:focus-visible {
-  transform: translateY(-50%) scale(1.08);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
 }
 
 .carousel-nav.prev {
   left: 8px;
-  right: auto;
 }
 
 .carousel-nav.next {
   right: 8px;
-  left: auto;
 }
 
 .dots {
@@ -457,7 +471,6 @@ main {
   left: 0;
   right: 0;
   bottom: 10px;
-  z-index: 3;
 }
 
 .dot {
@@ -1029,6 +1042,23 @@ select:focus {
   .cards-2,
   .cards-3 {
     grid-template-columns: 1fr;
+  }
+
+  .hero.hero-feature {
+    min-height: min(70vh, 520px);
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.95) 0%,
+        rgba(255, 255, 255, 0.84) 44%,
+        rgba(255, 255, 255, 0.24) 78%,
+        rgba(255, 255, 255, 0.08) 100%
+      ),
+      var(--hero-image);
+  }
+
+  .hero-content {
+    max-width: 100%;
   }
 
   .section {
