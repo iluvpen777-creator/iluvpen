@@ -1,8 +1,9 @@
-const CACHE_NAME = 'i-luv-pen-v2'
+const CACHE_NAME = 'i-luv-pen-v3'
 const URLS_TO_CACHE = ['./', './index.html', './manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(URLS_TO_CACHE)))
+  self.skipWaiting()
 })
 
 self.addEventListener('fetch', (event) => {
@@ -11,9 +12,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
   const isApiRequest = url.pathname.includes('/api/')
   const isDataJson = url.pathname.includes('/data/') && url.pathname.endsWith('.json')
+  const isStaticAsset = url.pathname.includes('/assets/')
 
   // Keep DB/API and JSON data fresh across devices.
   if (isApiRequest || isDataJson) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)))
+    return
+  }
+
+  // Always prefer network for versioned build assets to avoid stale UI copy.
+  if (isStaticAsset) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)))
     return
   }
@@ -43,6 +51,7 @@ self.addEventListener('activate', (event) => {
       ),
     ),
   )
+  self.clients.claim()
 })
 
 self.addEventListener('notificationclick', (event) => {
