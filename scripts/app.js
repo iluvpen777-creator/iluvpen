@@ -1529,23 +1529,26 @@ const renderAdmin = () => {
   <section class="section reveal">
     <div class="section-head"><h2>Admin Panel</h2><button type="button" class="btn ghost" data-admin-logout>Sign out</button></div>
 
-    <article class="card" style="margin-bottom: 14px;"><div class="card-body">
-      <h3>Repository Settings (required for commit)</h3>
-      <form class="admin-editor" data-admin-repo-config>
-        <label>Owner<input name="owner" value="${escapeHtml(state.repoConfig.owner || '')}" placeholder="iluvpen777-creator" required /></label>
-        <label>Repository<input name="repo" value="${escapeHtml(state.repoConfig.repo || '')}" placeholder="iluvpen" required /></label>
-        <label>Branch<input name="branch" value="${escapeHtml(state.repoConfig.branch || 'main')}" placeholder="main" required /></label>
-        <label>GitHub Token<input name="token" type="password" value="${escapeHtml(state.repoConfig.token || '')}" placeholder="ghp_xxx" required /></label>
-        <div class="editor-actions">
-          <button type="submit" class="btn">Save Repository Settings</button>
-        </div>
-      </form>
-    </div></article>
+    <article class="card"><details class="admin-panel-fold">
+      <summary class="admin-panel-toggle">Repository Settings (required for commit)</summary>
+      <div class="card-body">
+        <form class="admin-editor" data-admin-repo-config>
+          <label>Owner<input name="owner" value="${escapeHtml(state.repoConfig.owner || '')}" placeholder="iluvpen777-creator" required /></label>
+          <label>Repository<input name="repo" value="${escapeHtml(state.repoConfig.repo || '')}" placeholder="iluvpen" required /></label>
+          <label>Branch<input name="branch" value="${escapeHtml(state.repoConfig.branch || 'main')}" placeholder="main" required /></label>
+          <label>GitHub Token<input name="token" type="password" value="${escapeHtml(state.repoConfig.token || '')}" placeholder="ghp_xxx" required /></label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save Repository Settings</button>
+          </div>
+        </form>
+      </div>
+    </details></article>
 
     <div class="grid cards-2">
-      <article class="card"><div class="card-body">
-        <h3>Collection Management (data/pens.json)</h3>
-        <form class="admin-editor" data-admin-pens>
+      <article class="card"><details class="admin-panel-fold">
+        <summary class="admin-panel-toggle">Collection Management (data/pens.json)</summary>
+        <div class="card-body">
+          <form class="admin-editor" data-admin-pens>
           <label>Select existing ID
             <select name="pick"><option value="">New item</option>${state.pens.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.id)}</option>`).join('')}</select>
           </label>
@@ -1569,12 +1572,14 @@ const renderAdmin = () => {
             <button type="submit" class="btn">Add/Update + Commit</button>
             <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Commit</button>
           </div>
-        </form>
-      </div></article>
+          </form>
+        </div>
+      </details></article>
 
-      <article class="card"><div class="card-body">
-        <h3>News Management (data/blog.json)</h3>
-        <form class="admin-editor" data-admin-blogs>
+      <article class="card"><details class="admin-panel-fold">
+        <summary class="admin-panel-toggle">News Management (data/blog.json)</summary>
+        <div class="card-body">
+          <form class="admin-editor" data-admin-blogs>
           <label>Select existing slug
             <select name="pick"><option value="">New post</option>${state.blogs.map((b) => `<option value="${escapeHtml(b.slug)}">${escapeHtml(b.slug)}</option>`).join('')}</select>
           </label>
@@ -1599,12 +1604,14 @@ const renderAdmin = () => {
             <button type="submit" class="btn">Add/Update + Commit</button>
             <button type="button" class="btn ghost" data-admin-delete-blog>Delete + Commit</button>
           </div>
-        </form>
-      </div></article>
+          </form>
+        </div>
+      </details></article>
 
-      <article class="card"><div class="card-body">
-        <h3>Comment Management (data/comments.json)</h3>
-        <form class="admin-editor" data-admin-comments>
+      <article class="card"><details class="admin-panel-fold">
+        <summary class="admin-panel-toggle">Comment Management (data/comments.json)</summary>
+        <div class="card-body">
+          <form class="admin-editor" data-admin-comments>
           <label>Target ID (e.g. news:slug, community:id)<input name="targetId" required /></label>
           <label>Comment ID<input name="id" required /></label>
           <label>Nickname<input name="nickname" required /></label>
@@ -1624,8 +1631,9 @@ const renderAdmin = () => {
             <button type="submit" class="btn">Add/Update + Commit</button>
             <button type="button" class="btn ghost" data-admin-delete-comment>Delete + Commit</button>
           </div>
-        </form>
-      </div></article>
+          </form>
+        </div>
+      </details></article>
     </div>
   </section>
   `
