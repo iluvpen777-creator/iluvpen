@@ -870,6 +870,25 @@ const saveComments = () => {
   })
 }
 
+const saveCommentLike = (commentId, likes) => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
+  if (!USE_REMOTE_DB) {
+    localStorage.setItem(STORAGE_KEYS.comments, JSON.stringify(state.comments))
+    return
+  }
+
+  apiRequest('/api/state/comment-like', {
+    method: 'PATCH',
+    body: JSON.stringify({ commentId, likes }),
+  }).catch((error) => {
+    console.error('Failed to save comment like to DB:', error)
+    alert('Failed to save like to DB. Please check API/DB status.')
+  })
+}
+
 const saveCommunity = () => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
@@ -1501,7 +1520,7 @@ const renderHome = () => {
         if (post.__placeholder) {
           return `<article class="card news-card home-placeholder"><div class="card-body"><h3>Coming Soon</h3><p class="meta">News update in progress</p></div></article>`
         }
-        return `<article class="card news-card">
+        return `<article class="card news-card" data-open-news="${post.slug}">
           ${renderNewsThumbnailCarousel(post, 'home-news')}
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
@@ -1641,7 +1660,7 @@ const renderNewsList = () => {
     <div class="section-head"><h2>News</h2><p class="muted">Admin-managed publishing system</p>${isAdmin() ? '<a href="#/admin" class="btn ghost">Add</a>' : ''}</div>
     <div class="grid home-quad-grid">${posts
       .map(
-        (post) => `<article class="card news-card">
+        (post) => `<article class="card news-card" data-open-news="${post.slug}">
           ${renderNewsThumbnailCarousel(post, 'news-list')}
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
@@ -1691,7 +1710,7 @@ const renderNewsDetail = (slug) => {
     <h2>Related Articles</h2>
     <div class="grid cards-2">${related
       .map(
-        (item) => `<article class="card"><div class="card-body"><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.subtitle)}</p><a href="#/news/${item.slug}" class="text-link">Read</a></div></article>`,
+        (item) => `<article class="card" data-open-news="${item.slug}"><div class="card-body"><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.subtitle)}</p><a href="#/news/${item.slug}" class="text-link">Read</a></div></article>`,
       )
       .join('')}</div>
   </section>
@@ -2317,6 +2336,7 @@ const bindCarousel = () => {
 const bindInteractions = () => {
   document.addEventListener('click', (event) => {
     const openPen = event.target.closest('[data-open-pen]')
+    const openNews = event.target.closest('[data-open-news]')
     const createPost = event.target.closest('[data-create-community]')
     const likeCommunity = event.target.closest('[data-like-community]')
     const deleteCommunity = event.target.closest('[data-delete-community]')
@@ -2366,6 +2386,10 @@ const bindInteractions = () => {
 
     if (openPen && !clickedAdminControl) {
       location.hash = `#/pen/${openPen.dataset.openPen}`
+    }
+
+    if (openNews && !clickedAdminControl) {
+      location.hash = `#/news/${openNews.dataset.openNews}`
     }
 
     if (adminOpen) {
@@ -2490,7 +2514,7 @@ const bindInteractions = () => {
           const nowLiked = toggleLikeMark('comments', comment.id)
           comment.likes = Math.max(0, Number(comment.likes || 0) + (nowLiked ? 1 : -1))
           syncCommentLikeUi(likeComment, nowLiked, comment.likes)
-          saveComments()
+          saveCommentLike(comment.id, comment.likes)
           break
         }
       }

@@ -493,6 +493,32 @@ app.get('/api/state/comments-map', async (_req, res) => {
   }
 })
 
+app.patch('/api/state/comment-like', async (req, res) => {
+  const commentId = String(req.body?.commentId || '').trim()
+  const likes = Number(req.body?.likes)
+
+  if (!commentId || !Number.isFinite(likes)) {
+    return res.status(400).json({ ok: false, message: 'Invalid comment like payload' })
+  }
+
+  try {
+    const result = await pool.query(
+      `update comments
+       set likes = $2
+       where id = $1`,
+      [commentId, Math.max(0, Math.floor(likes))],
+    )
+
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Comment not found' })
+    }
+
+    return res.json({ ok: true, commentId, likes: Math.max(0, Math.floor(likes)) })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
 app.put('/api/state/comments-map', async (req, res) => {
   const payload = req.body?.comments || req.body
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
