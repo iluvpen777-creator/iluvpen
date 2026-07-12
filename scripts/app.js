@@ -1098,8 +1098,9 @@ const renderHome = () => {
         <p class="eyebrow">Premium Archive</p>
         <h1>i_luv_pen</h1>
         <div class="hero-actions">
-          <a class="btn" href="#/collection">View Collection</a>
-          <a class="btn ghost" href="#/news">Latest News</a>
+          <a class="btn home-white-btn" href="#/collection">View Collection</a>
+          <a class="btn home-white-btn" href="#/news">Latest News</a>
+          <a class="btn home-white-btn" href="#/community">Community</a>
         </div>
       </div>
     </section>
@@ -1368,7 +1369,7 @@ const renderCommunityBoard = (params) => {
             }
             <span class="board-title">${escapeHtml(post.title)} <em class="board-count">[${getComments(`community:${post.id}`).length}]</em></span>
           </span>
-          <span class="board-author">${escapeHtml(post.nickname)}</span>
+          <span class="board-author">${renderUserAvatar(post.nickname, 'xs', post.profileImage || getProfileImageByNickname(post.nickname))}${escapeHtml(post.nickname)}</span>
           <span class="board-time">${formatDate(post.createdAt)}</span>
         </a>`,
       )
@@ -1387,7 +1388,7 @@ const renderCommunityDetail = (postId) => {
     <a href="#/community" class="text-link">← Back to Community</a>
     <article class="list-item social-post ${post.pinned ? 'pinned' : ''}" data-community-id="${post.id}">
       <div class="social-head">
-        ${renderUserAvatar(post.nickname, 'md')}
+        ${renderUserAvatar(post.nickname, 'md', post.profileImage || getProfileImageByNickname(post.nickname))}
         <div class="social-meta"><strong>${escapeHtml(post.nickname)}</strong><span>${post.pinned ? 'Pinned by admin · ' : ''}${formatDate(post.createdAt)}</span></div>
       </div>
       <h3 class="social-title">${escapeHtml(post.title)}</h3>
@@ -2626,6 +2627,7 @@ const bindInteractions = () => {
       state.community.unshift({
         id: uid(),
         nickname,
+        profileImage: getCurrentUserAvatar(),
         title,
         content,
         image: images.join('\n'),

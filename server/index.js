@@ -58,6 +58,7 @@ const verifyUserPassword = async (nickname, password) => {
 const normalizeCommunity = (row) => ({
   id: row.id,
   nickname: row.nickname,
+  profileImage: row.profile_image || '',
   title: row.title,
   content: row.content,
   image: row.image || '',
@@ -329,9 +330,11 @@ app.delete('/api/auth/user', async (req, res) => {
 app.get('/api/state/community', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `select id, nickname, title, content, image, likes, pinned, created_at
-       from community_posts
-       order by pinned desc, created_at desc`,
+      `select c.id, c.nickname, c.title, c.content, c.image, c.likes, c.pinned, c.created_at,
+              coalesce(u.profile_image, '') as profile_image
+       from community_posts c
+       left join users u on lower(u.nickname) = lower(c.nickname)
+       order by c.pinned desc, c.created_at desc`,
     )
     res.json(rows.map(normalizeCommunity))
   } catch (error) {

@@ -660,6 +660,12 @@ main {
   font-size: 0.9rem;
 }
 
+.board-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .board-title {
   font-weight: 600;
   overflow: hidden;
