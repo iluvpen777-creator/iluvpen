@@ -907,6 +907,16 @@ const canUseNotificationApi = () => typeof window !== 'undefined' && 'Notificati
 
 const isNotificationOptedIn = () => localStorage.getItem(STORAGE_KEYS.notificationOptIn) === 'true'
 
+const requestNotificationPermissionSafe = async () => {
+  if (!canUseNotificationApi()) return 'denied'
+  try {
+    const result = Notification.requestPermission()
+    return await Promise.resolve(result)
+  } catch {
+    return 'denied'
+  }
+}
+
 const notifyUser = async (title, options = {}) => {
   if (!canUseNotificationApi()) return
   if (Notification.permission !== 'granted') return
@@ -2542,20 +2552,15 @@ const bindInteractions = () => {
       localStorage.setItem(STORAGE_KEYS.notificationPromptSeen, '1')
 
       if (action === 'accept') {
-        Notification.requestPermission()
-          .then(async (permission) => {
-            localStorage.setItem(STORAGE_KEYS.notificationOptIn, permission === 'granted' ? 'true' : 'false')
-            state.notificationConsentModalOpen = false
-            if (permission === 'granted') {
-              await maybeRunNotificationChecks()
-            }
-            render()
-          })
-          .catch(() => {
-            localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
-            state.notificationConsentModalOpen = false
-            render()
-          })
+        ;(async () => {
+          const permission = Notification.permission === 'granted' ? 'granted' : await requestNotificationPermissionSafe()
+          localStorage.setItem(STORAGE_KEYS.notificationOptIn, permission === 'granted' ? 'true' : 'false')
+          state.notificationConsentModalOpen = false
+          if (permission === 'granted') {
+            await maybeRunNotificationChecks()
+          }
+          render()
+        })()
       } else {
         localStorage.setItem(STORAGE_KEYS.notificationOptIn, 'false')
         state.notificationConsentModalOpen = false
