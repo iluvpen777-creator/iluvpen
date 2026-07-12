@@ -217,28 +217,51 @@ main {
   padding: clamp(20px, 4vw, 34px);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   background-color: var(--card);
-  background-image:
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.88) 34%,
-      rgba(255, 255, 255, 0.56) 56%,
-      rgba(255, 255, 255, 0.12) 76%,
-      rgba(255, 255, 255, 0) 100%
-    ),
-    var(--hero-image);
+  background-image: var(--hero-image);
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
   align-content: space-between;
 }
 
+.hero.hero-feature::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.9) 28%,
+      rgba(255, 255, 255, 0.64) 44%,
+      rgba(255, 255, 255, 0.28) 56%,
+      rgba(255, 255, 255, 0.08) 62%,
+      rgba(255, 255, 255, 0) 68%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0) 20%,
+      rgba(255, 255, 255, 0) 80%,
+      rgba(255, 255, 255, 0.16) 100%
+    );
+}
+
 .hero-content {
+  position: relative;
+  z-index: 1;
   max-width: min(60ch, 62%);
 }
 
 .hero-caption {
+  position: relative;
+  z-index: 1;
   margin: 0;
   padding-inline: 2px;
   color: color-mix(in oklab, var(--muted), #4f3a2a 18%);
@@ -1057,18 +1080,28 @@ select:focus {
 
   .hero.hero-feature {
     min-height: min(70vh, 520px);
-    background-image:
-      linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.96) 0%,
-        rgba(255, 255, 255, 0.9) 42%,
-        rgba(255, 255, 255, 0.62) 68%,
-        rgba(255, 255, 255, 0.22) 88%,
-        rgba(255, 255, 255, 0) 100%
-      ),
-      var(--hero-image);
     background-repeat: no-repeat;
     background-position: right center;
+  }
+
+  .hero.hero-feature::before {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.97) 0%,
+        rgba(255, 255, 255, 0.92) 38%,
+        rgba(255, 255, 255, 0.68) 56%,
+        rgba(255, 255, 255, 0.32) 68%,
+        rgba(255, 255, 255, 0.1) 74%,
+        rgba(255, 255, 255, 0) 80%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 255, 255, 0) 18%,
+        rgba(255, 255, 255, 0) 82%,
+        rgba(255, 255, 255, 0.18) 100%
+      );
   }
 
   .hero-content {
