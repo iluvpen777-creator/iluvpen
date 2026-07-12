@@ -419,12 +419,20 @@ main {
   margin: 0 0 6px;
   font-size: clamp(1rem, 1.6vw, 1.2rem);
   line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .home-quad-grid .card-body p {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .home-quad-grid .news-card .carousel-image {
@@ -1222,7 +1230,49 @@ select:focus {
 
 @media (max-width: 560px) {
   .home-quad-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .home-quad-grid .card-body {
+    padding: 8px;
+  }
+
+  .home-quad-grid .card-body h3 {
+    font-size: 0.9rem;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+
+  .home-quad-grid .card-body p,
+  .home-quad-grid .card-body .meta,
+  .home-quad-grid .card-body .text-link {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  .home-quad-grid .carousel-nav {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+
+  .home-quad-grid .carousel-nav.prev {
+    left: 4px;
+  }
+
+  .home-quad-grid .carousel-nav.next {
+    right: 4px;
+  }
+
+  .home-quad-grid .dots {
+    bottom: 6px;
+    gap: 4px;
+  }
+
+  .home-quad-grid .dot {
+    width: 6px;
+    height: 6px;
   }
 }
 
