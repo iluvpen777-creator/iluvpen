@@ -972,7 +972,7 @@ const maybeNotifyNewsUpdates = async () => {
   if (!newsToNotify.length) return
 
   for (const item of newsToNotify.slice(-3)) {
-    await notifyUser('새 뉴스가 올라왔어요', {
+    await notifyUser('New article published', {
       body: item.title,
       data: { url: `${location.origin}${location.pathname}#/news/${item.slug}` },
     })
@@ -1011,7 +1011,7 @@ const maybeNotifyMentions = async () => {
 
   if (freshMentions.length) {
     for (const mention of freshMentions.slice(-3)) {
-      await notifyUser('멘션 알림', {
+      await notifyUser('Community update', {
         body: `${mention.author}: ${String(mention.content).slice(0, 80)}`,
         data: { url: `${location.origin}${location.pathname}#/${mention.targetId.startsWith('news:') ? 'news/' + mention.targetId.replace('news:', '') : 'community/' + mention.targetId.replace('community:', '')}` },
       })
@@ -2325,12 +2325,12 @@ const renderNotificationConsentModal = () => {
   <div class="compose-modal" role="dialog" aria-modal="true" aria-label="Notification consent">
     <div class="compose-sheet consent-sheet">
       <div class="section-head">
-        <h3>알림 설정</h3>
+        <h3>Notification settings</h3>
       </div>
-      <p class="muted consent-copy">새 뉴스와 멘션 소식을 사이트 알림으로 받아볼까요?</p>
+      <p class="muted consent-copy">Would you like to receive new article and community update notifications?</p>
       <div class="editor-actions">
-        <button type="button" class="btn" data-notification-consent="accept">동의하고 받기</button>
-        <button type="button" class="btn ghost" data-notification-consent="decline">지금은 안 받을게요</button>
+        <button type="button" class="btn" data-notification-consent="accept">Enable notifications</button>
+        <button type="button" class="btn ghost" data-notification-consent="decline">Not now</button>
       </div>
     </div>
   </div>
