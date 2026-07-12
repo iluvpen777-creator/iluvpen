@@ -30,6 +30,30 @@ create table if not exists community_posts (
 alter table community_posts
   add column if not exists topic text not null default 'General';
 
+create table if not exists pen_items (
+  id text primary key,
+  name text not null,
+  series text not null,
+  year integer not null,
+  description text,
+  description_long text,
+  keywords jsonb not null default '[]'::jsonb,
+  images jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists news_posts (
+  slug text primary key,
+  title text not null,
+  subtitle text,
+  cover_image text,
+  category text,
+  tags jsonb not null default '[]'::jsonb,
+  published_at timestamptz not null default now(),
+  reading_time integer not null default 5,
+  content text not null
+);
+
 create table if not exists comments (
   id text primary key,
   target_id text not null,

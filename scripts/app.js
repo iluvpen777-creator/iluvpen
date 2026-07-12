@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.BASE_URL
+﻿const BASE_URL = import.meta.env.BASE_URL
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 const USE_REMOTE_DB = Boolean(API_BASE_URL) || Boolean(import.meta.env.DEV)
 const IS_PROD = Boolean(import.meta.env.PROD)
@@ -20,9 +20,11 @@ const requireSyncedDbMode = () => {
   warnRemoteDbRequired()
   return false
 }
+
 const PROFILE_AVATAR_URL = new URL('../images/profile.jpg', import.meta.url).href
 const DEFAULT_USER_AVATAR =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d5d5d5"/><circle cx="32" cy="24" r="12" fill="%23f6f6f6"/><path d="M12 54c4-10 12-16 20-16s16 6 20 16" fill="%23f6f6f6"/></svg>'
+
 const STORAGE_KEYS = {
   theme: 'iluvpen_theme',
   lang: 'iluvpen_lang',
@@ -32,26 +34,18 @@ const STORAGE_KEYS = {
   comments: 'iluvpen_comments',
   testCommentsSeeded: 'iluvpen_test_comments_seeded',
   admin: 'iluvpen_admin_auth',
-  repoConfig: 'iluvpen_repo_config',
   resetVersion: 'iluvpen_reset_version',
   likeMarks: 'iluvpen_like_marks',
 }
 
 const DATA_RESET_VERSION = '2026-07-11-clean-all-test-content'
 
-
 const state = {
   pens: [],
-  blogs: [],
+  news: [],
   community: [],
   site: null,
   comments: {},
-  repoConfig: {
-    owner: '',
-    repo: '',
-    branch: 'main',
-    token: '',
-  },
   lang: 'en',
   currentRoute: { page: 'home', param: '' },
   accountMenuOpen: false,
@@ -65,132 +59,31 @@ const SUPPORTED_LANGS = ['ko', 'en', 'zh', 'ja']
 
 const I18N = {
   en: {
-    언어: 'Language',
-    '언어 선택': 'Select language',
-    '닉네임을 입력해주세요 (회원가입 없음)': 'Please enter your nickname (no sign-up required).',
-    '이미지 파일을 읽지 못했습니다.': 'Unable to read the image file.',
-    '이미지 파일만 업로드할 수 있습니다.': 'Only image files can be uploaded.',
-    '첫 댓글을 남겨주세요.': 'Be the first to leave a comment.',
-    댓글: 'Comment',
-    '댓글을 작성해주세요': 'Write your comment',
-    '이미지 URL (선택)': 'Image URL (optional)',
-    '이미지 파일 (선택)': 'Image file (optional)',
-    '댓글 등록': 'Post comment',
-    '커뮤니티 글쓰기': 'Write community post',
-    닫기: 'Close',
-    제목: 'Title',
-    내용: 'Content',
-    등록: 'Submit',
-    취소: 'Cancel',
-    '이전 이미지': 'Previous image',
-    '다음 이미지': 'Next image',
-    '이미지 ': 'Image ',
-    '컬렉션 보기': 'View collection',
-    '최신 매거진': 'Latest magazine',
-    '대표 만년필': 'Featured fountain pen',
-    '전체 보기': 'View all',
-    매거진: 'Magazine',
-    읽기: 'Read',
-    커뮤니티: 'Community',
-    검색: 'Search',
-    정렬: 'Sort',
-    최신순: 'Newest',
-    오래된순: 'Oldest',
-    이름순: 'Name',
-    출시년도순: 'Release year',
-    시리즈별: 'Series',
-    '만년필을 찾을 수 없습니다.': 'Pen not found.',
-    '컬렉션으로 돌아가기': 'Back to collection',
-    '전체화면 보기': 'Fullscreen',
-    '관련 만년필': 'Related pens',
-    '관리자 전용 작성 시스템': 'Admin-only publishing system',
-    '아티클 열기': 'Open article',
-    '포스트를 찾을 수 없습니다.': 'Post not found.',
-    '블로그로 돌아가기': 'Back to blog',
-    댓글들: 'Comments',
-    글쓰기: 'Write post',
-    인기순: 'Most liked',
-    '댓글 많은 순': 'Most commented',
-    '관리자 고정 · ': 'Pinned by admin · ',
-    좋아요: 'Likes',
-    답글: 'Reply',
-    수정: 'Edit',
-    삭제: 'Delete',
     Home: 'Home',
     Collection: 'Collection',
-    Blog: 'Blog',
+    News: 'News',
     Community: 'Community',
     About: 'About',
     Search: 'Search',
     Admin: 'Admin',
-    '다크 모드 토글': 'Toggle dark mode',
-    'SNS 바로가기': 'Social links',
-    '내용 수정': 'Edit content',
-    '답글을 입력하세요': 'Write a reply',
-    '비밀번호가 맞지 않습니다.': 'Incorrect password.',
-    '임시저장 완료': 'Draft saved.',
   },
   zh: {
-    언어: '语言',
-    '언어 선택': '选择语言',
     Home: '首页',
     Collection: '收藏',
-    Blog: '博客',
+    News: '新闻',
     Community: '社区',
     About: '关于',
     Search: '搜索',
     Admin: '管理',
-    글쓰기: '发帖',
-    댓글: '评论',
-    검색: '搜索',
-    정렬: '排序',
-    최신순: '最新',
-    오래된순: '最早',
-    이름순: '名称',
-    출시년도순: '发行年份',
-    시리즈별: '系列',
-    좋아요: '点赞',
-    답글: '回复',
-    수정: '编辑',
-    삭제: '删除',
-    닫기: '关闭',
-    제목: '标题',
-    내용: '内容',
-    등록: '提交',
-    취소: '取消',
-    '이미지 URL (선택)': '图片 URL（可选）',
-    '이미지 파일 (선택)': '图片文件（可选）',
   },
   ja: {
-    언어: '言語',
-    '언어 선택': '言語を選択',
     Home: 'ホーム',
     Collection: 'コレクション',
-    Blog: 'ブログ',
+    News: 'ニュース',
     Community: 'コミュニティ',
     About: '概要',
     Search: '検索',
     Admin: '管理',
-    글쓰기: '投稿',
-    댓글: 'コメント',
-    검색: '検索',
-    정렬: '並び替え',
-    최신순: '新しい順',
-    오래된순: '古い順',
-    이름순: '名前順',
-    출시년도순: '発売年順',
-    시리즈별: 'シリーズ別',
-    좋아요: 'いいね',
-    답글: '返信',
-    수정: '編集',
-    삭제: '削除',
-    닫기: '閉じる',
-    제목: 'タイトル',
-    내용: '内容',
-    등록: '投稿',
-    취소: 'キャンセル',
-    '이미지 URL (선택)': '画像 URL（任意）',
-    '이미지 파일 (선택)': '画像ファイル（任意）',
   },
 }
 
@@ -211,86 +104,6 @@ const localizeHtml = (html) => {
     localized = localized.split(source).join(target)
   }
   return localized
-}
-
-const getSavedRepoConfig = () => {
-  const raw = localStorage.getItem(STORAGE_KEYS.repoConfig)
-  if (!raw) return { owner: '', repo: '', branch: 'main', token: '' }
-  try {
-    const parsed = JSON.parse(raw)
-    return {
-      owner: parsed.owner || '',
-      repo: parsed.repo || '',
-      branch: parsed.branch || 'main',
-      token: parsed.token || '',
-    }
-  } catch {
-    return { owner: '', repo: '', branch: 'main', token: '' }
-  }
-}
-
-const saveRepoConfig = () => {
-  localStorage.setItem(STORAGE_KEYS.repoConfig, JSON.stringify(state.repoConfig))
-}
-
-const toBase64Utf8 = (value) => btoa(unescape(encodeURIComponent(value)))
-
-const githubRequest = async (path, options = {}) => {
-  const { owner, repo, token } = state.repoConfig
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    Authorization: `Bearer ${token}`,
-    ...options.headers,
-  }
-
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
-    ...options,
-    headers,
-  })
-
-  if (!response.ok) {
-    const reason = await response.text()
-    throw new Error(`GitHub API error: ${response.status} ${reason}`)
-  }
-
-  return response.json()
-}
-
-const ensureRepoConfig = () => {
-  const { owner, repo, branch, token } = state.repoConfig
-  if (!owner || !repo || !branch || !token) {
-    alert('Please save GitHub repository settings (owner/repo/branch/token) in Admin first.')
-    return false
-  }
-  return true
-}
-
-const commitJsonToRepo = async (filePath, data, message) => {
-  if (!ensureRepoConfig()) return false
-
-  const { branch } = state.repoConfig
-  let sha = undefined
-  try {
-    const existing = await githubRequest(`/contents/${filePath}?ref=${encodeURIComponent(branch)}`)
-    sha = existing.sha
-  } catch {
-    sha = undefined
-  }
-
-  const content = `${JSON.stringify(data, null, 2)}\n`
-
-  await githubRequest(`/contents/${filePath}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      content: toBase64Utf8(content),
-      branch,
-      sha,
-    }),
-  })
-
-  return true
 }
 
 const formatDate = (dateValue) => {
@@ -881,10 +694,6 @@ const isAdmin = () => {
   const adminFlag = localStorage.getItem(STORAGE_KEYS.admin) === 'true'
   return adminFlag && isCurrentProtectedAdmin()
 }
-const hasRepoConfig = () => {
-  const { owner, repo, branch, token } = state.repoConfig
-  return Boolean(owner && repo && branch && token)
-}
 
 const getPersistFailureMessage = (error, fallbackMessage) => {
   const message = String(error?.message || '')
@@ -927,6 +736,38 @@ const saveCommunity = () => {
   }).catch((error) => {
     console.error('Failed to save community to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save community to DB. Please check API/DB status.'))
+  })
+}
+
+const savePen = () => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
+  if (!USE_REMOTE_DB) return
+
+  apiRequest('/api/state/pen', {
+    method: 'PUT',
+    body: JSON.stringify({ pen: state.pens }),
+  }).catch((error) => {
+    console.error('Failed to save collection to DB:', error)
+    alert(getPersistFailureMessage(error, 'Failed to save collection to DB. Please check API/DB status.'))
+  })
+}
+
+const saveNews = () => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
+  if (!USE_REMOTE_DB) return
+
+  apiRequest('/api/state/news', {
+    method: 'PUT',
+    body: JSON.stringify({ news: state.news }),
+  }).catch((error) => {
+    console.error('Failed to save news to DB:', error)
+    alert(getPersistFailureMessage(error, 'Failed to save news to DB. Please check API/DB status.'))
   })
 }
 
@@ -1186,9 +1027,9 @@ const askAdminImageSource = (title, initialUrl = '') =>
 const renderPenCarousel = (pen) => {
   return `
   <div class="carousel" data-carousel-id="${pen.id}">
-    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">‹</button>
     <img src="${pen.images[0]}" alt="${escapeHtml(pen.name)}" class="carousel-image" loading="lazy" data-carousel-image="${pen.id}" />
-    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">›</button>
+    <button type="button" aria-label="Previous image" class="carousel-nav prev" data-carousel-prev="${pen.id}">??/button>
+    <button type="button" aria-label="Next image" class="carousel-nav next" data-carousel-next="${pen.id}">??/button>
     <div class="dots">${pen.images
       .map((_, idx) => `<button type="button" class="dot ${idx === 0 ? 'active' : ''}" data-carousel-dot="${pen.id}:${idx}" aria-label="Image ${idx + 1}"></button>`)
       .join('')}</div>
@@ -1200,7 +1041,7 @@ const renderHome = () => {
   const newestCollectionPen = [...state.pens].sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   )[0]
-  const latestBlogs = [...state.blogs].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3)
+  const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
   return `
@@ -1238,9 +1079,9 @@ const renderHome = () => {
 
   <section class="section reveal">
     <div class="section-head"><h2>Latest News</h2><a href="#/news">News</a></div>
-    <div class="grid cards-3">${latestBlogs
+    <div class="grid cards-3">${latestNews
       .map(
-        (post) => `<article class="card blog-card">
+        (post) => `<article class="card news-card">
           <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
@@ -1373,14 +1214,14 @@ const renderPenDetail = (id) => {
   `
 }
 
-const renderBlogList = () => {
-  const posts = [...state.blogs].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+const renderNewsList = () => {
+  const posts = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
   return `
   <section class="section reveal">
     <div class="section-head"><h2>News</h2><p class="muted">Admin-managed publishing system</p>${isAdmin() ? '<a href="#/admin" class="btn ghost">Add</a>' : ''}</div>
     <div class="grid cards-2">${posts
       .map(
-        (post) => `<article class="card blog-card">
+        (post) => `<article class="card news-card">
           <img src="${post.coverImage}" alt="${escapeHtml(post.title)}" loading="lazy" />
           <div class="card-body">
             <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
@@ -1390,7 +1231,7 @@ const renderBlogList = () => {
             <a href="#/news/${post.slug}" class="text-link">Open article</a>
             ${
               isAdmin()
-                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-blog-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-blog-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-blog-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-blog-inline="${post.slug}">Delete</button></div>`
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-news-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-news-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-news-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-news-inline="${post.slug}">Delete</button></div>`
                 : ''
             }
           </div>
@@ -1400,11 +1241,11 @@ const renderBlogList = () => {
   </section>`
 }
 
-const renderBlogDetail = (slug) => {
-  const post = state.blogs.find((item) => item.slug === slug)
+const renderNewsDetail = (slug) => {
+  const post = state.news.find((item) => item.slug === slug)
   if (!post) return '<section class="section"><h2>Post not found.</h2></section>'
 
-  const related = state.blogs.filter((item) => item.slug !== slug && item.category === post.category).slice(0, 2)
+  const related = state.news.filter((item) => item.slug !== slug && item.category === post.category).slice(0, 2)
 
   return `
   <section class="section reveal">
@@ -1419,7 +1260,7 @@ const renderBlogDetail = (slug) => {
       <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
       ${
         isAdmin()
-              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-blog-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-blog-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-blog-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-blog-inline="${post.slug}">Delete</button></div>`
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-news-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-news-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-news-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-news-inline="${post.slug}">Delete</button></div>`
           : ''
       }
     </article>
@@ -1502,7 +1343,7 @@ const renderCommunityDetail = (postId) => {
         .join('')}
       <div class="post-actions">
         <button type="button" class="text-btn community-like-btn ${hasLiked('community', post.id) ? 'liked' : ''}" data-like-community="${post.id}">${
-          hasLiked('community', post.id) ? '♥' : '♡'
+          hasLiked('community', post.id) ? '&#9829;' : '&#9825;'
         } Likes ${post.likes}</button>
         ${
           canManageOwnedContent(post.nickname)
@@ -1575,24 +1416,9 @@ const renderAdmin = () => {
   <section class="section reveal">
     <div class="section-head"><h2>Admin Panel</h2><button type="button" class="btn ghost" data-admin-logout>Sign out</button></div>
 
-    <article class="card"><details class="admin-panel-fold">
-      <summary class="admin-panel-toggle">Repository Settings (required for commit)</summary>
-      <div class="card-body">
-        <form class="admin-editor" data-admin-repo-config>
-          <label>Owner<input name="owner" value="${escapeHtml(state.repoConfig.owner || '')}" placeholder="iluvpen777-creator" required /></label>
-          <label>Repository<input name="repo" value="${escapeHtml(state.repoConfig.repo || '')}" placeholder="iluvpen" required /></label>
-          <label>Branch<input name="branch" value="${escapeHtml(state.repoConfig.branch || 'main')}" placeholder="main" required /></label>
-          <label>GitHub Token<input name="token" type="password" value="${escapeHtml(state.repoConfig.token || '')}" placeholder="ghp_xxx" required /></label>
-          <div class="editor-actions">
-            <button type="submit" class="btn">Save Repository Settings</button>
-          </div>
-        </form>
-      </div>
-    </details></article>
-
     <div class="grid cards-2">
       <article class="card"><details class="admin-panel-fold">
-        <summary class="admin-panel-toggle">Collection Management (data/pens.json)</summary>
+        <summary class="admin-panel-toggle">Collection Management (DB)</summary>
         <div class="card-body">
           <form class="admin-editor" data-admin-pens>
           <label>Select existing ID
@@ -1615,19 +1441,19 @@ const renderAdmin = () => {
           </label>
           <label>Keywords (comma-separated)<input name="keywords" /></label>
           <div class="editor-actions">
-            <button type="submit" class="btn">Add/Update + Commit</button>
-            <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Commit</button>
+            <button type="submit" class="btn">Add/Update + Save</button>
+            <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Save</button>
           </div>
           </form>
         </div>
       </details></article>
 
       <article class="card"><details class="admin-panel-fold">
-        <summary class="admin-panel-toggle">News Management (data/blog.json)</summary>
+        <summary class="admin-panel-toggle">News Management (DB)</summary>
         <div class="card-body">
-          <form class="admin-editor" data-admin-blogs>
+          <form class="admin-editor" data-admin-news>
           <label>Select existing slug
-            <select name="pick"><option value="">New post</option>${state.blogs.map((b) => `<option value="${escapeHtml(b.slug)}">${escapeHtml(b.slug)}</option>`).join('')}</select>
+            <select name="pick"><option value="">New post</option>${state.news.map((b) => `<option value="${escapeHtml(b.slug)}">${escapeHtml(b.slug)}</option>`).join('')}</select>
           </label>
           <label>Slug<input name="slug" required /></label>
           <label>Title<input name="title" required /></label>
@@ -1647,15 +1473,15 @@ const renderAdmin = () => {
           <label>Reading time (minutes)<input name="readingTime" type="number" min="1" value="5" /></label>
           <label>Content (Markdown)<textarea name="content" rows="6" required></textarea></label>
           <div class="editor-actions">
-            <button type="submit" class="btn">Add/Update + Commit</button>
-            <button type="button" class="btn ghost" data-admin-delete-blog>Delete + Commit</button>
+            <button type="submit" class="btn">Add/Update + Save</button>
+            <button type="button" class="btn ghost" data-admin-delete-news>Delete + Save</button>
           </div>
           </form>
         </div>
       </details></article>
 
       <article class="card"><details class="admin-panel-fold">
-        <summary class="admin-panel-toggle">Comment Management (data/comments.json)</summary>
+        <summary class="admin-panel-toggle">Comment Management (DB)</summary>
         <div class="card-body">
           <form class="admin-editor" data-admin-comments>
           <label>Target ID (e.g. news:slug, community:id)<input name="targetId" required /></label>
@@ -1674,8 +1500,8 @@ const renderAdmin = () => {
           <label>Likes<input name="likes" type="number" value="0" /></label>
           <label>Created at (ISO)<input name="createdAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
           <div class="editor-actions">
-            <button type="submit" class="btn">Add/Update + Commit</button>
-            <button type="button" class="btn ghost" data-admin-delete-comment>Delete + Commit</button>
+            <button type="submit" class="btn">Add/Update + Save</button>
+            <button type="button" class="btn ghost" data-admin-delete-comment>Delete + Save</button>
           </div>
           </form>
         </div>
@@ -1721,7 +1547,7 @@ const renderHeader = () => `
           }</div>`
         : '<button type="button" class="btn ghost" data-pick-nickname>Create account</button>'
     }
-    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">◐</button>
+    <button type="button" class="icon-btn" data-toggle-theme aria-label="Toggle dark mode">??/button>
   </div>
 </header>
 `
@@ -1737,7 +1563,7 @@ const renderQuickLinks = () => `
 
 const renderFooter = () => `
 <footer class="site-footer">
-  <p>© ${new Date().getFullYear()} i_luv_pen. Premium Fountain Pen Archive.</p>
+  <p>짤 ${new Date().getFullYear()} i_luv_pen. Premium Fountain Pen Archive.</p>
   ${isAdmin() ? '<a href="#/admin">Admin</a>' : ''}
 </footer>
 `
@@ -1899,8 +1725,8 @@ const renderLayout = () => {
   if (state.currentRoute.page === 'home') pageHtml = renderHome()
   if (state.currentRoute.page === 'collection') pageHtml = renderCollection(params)
   if (state.currentRoute.page === 'pen') pageHtml = renderPenDetail(state.currentRoute.param)
-  if (state.currentRoute.page === 'news' && !state.currentRoute.param) pageHtml = renderBlogList()
-  if (state.currentRoute.page === 'news' && state.currentRoute.param) pageHtml = renderBlogDetail(state.currentRoute.param)
+  if (state.currentRoute.page === 'news' && !state.currentRoute.param) pageHtml = renderNewsList()
+  if (state.currentRoute.page === 'news' && state.currentRoute.param) pageHtml = renderNewsDetail(state.currentRoute.param)
   if (state.currentRoute.page === 'community') pageHtml = renderCommunity(params, state.currentRoute.param)
   if (state.currentRoute.page === 'about') pageHtml = renderAbout()
   if (state.currentRoute.page === 'search') pageHtml = renderSearch()
@@ -1921,14 +1747,57 @@ const renderLayout = () => {
 
 const bindCarousel = () => {
   const indexes = new Map()
-  const update = (id, nextIndex) => {
+  const animateImageSwap = (img, direction, applySwap) => {
+    if (!img || typeof img.animate !== 'function') {
+      applySwap()
+      return
+    }
+
+    if (img.dataset.animating === 'true') {
+      applySwap()
+      return
+    }
+
+    img.dataset.animating = 'true'
+    const offset = direction >= 0 ? 34 : -34
+
+    const fadeOut = img.animate(
+      [
+        { transform: 'translateX(0) scale(1)', opacity: 1 },
+        { transform: `translateX(${-offset}px) scale(0.98)`, opacity: 0.35 },
+      ],
+      { duration: 150, easing: 'ease-in' },
+    )
+
+    fadeOut.onfinish = () => {
+      applySwap()
+      const fadeIn = img.animate(
+        [
+          { transform: `translateX(${offset}px) scale(0.98)`, opacity: 0.35 },
+          { transform: 'translateX(0) scale(1)', opacity: 1 },
+        ],
+        { duration: 280, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      )
+      fadeIn.onfinish = () => {
+        img.dataset.animating = 'false'
+      }
+    }
+  }
+
+  const update = (id, nextIndex, direction = 1) => {
     const pen = state.pens.find((item) => item.id === id)
     if (!pen) return
+    const current = indexes.get(id) || 0
     const safe = ((nextIndex % pen.images.length) + pen.images.length) % pen.images.length
+    if (safe === current) return
     indexes.set(id, safe)
 
     const img = document.querySelector(`[data-carousel-image="${id}"]`)
-    if (img) img.src = pen.images[safe]
+    if (img) {
+      animateImageSwap(img, direction, () => {
+        img.src = pen.images[safe]
+      })
+    }
 
     document.querySelectorAll(`[data-carousel-dot^="${id}:"]`).forEach((dot, idx) => {
       dot.classList.toggle('active', idx === safe)
@@ -1942,17 +1811,63 @@ const bindCarousel = () => {
 
     if (prev) {
       const id = prev.dataset.carouselPrev
-      update(id, (indexes.get(id) || 0) - 1)
+      update(id, (indexes.get(id) || 0) - 1, -1)
     }
     if (next) {
       const id = next.dataset.carouselNext
-      update(id, (indexes.get(id) || 0) + 1)
+      update(id, (indexes.get(id) || 0) + 1, 1)
     }
     if (dot) {
       const [id, idx] = dot.dataset.carouselDot.split(':')
-      update(id, Number(idx))
+      const target = Number(idx)
+      const current = indexes.get(id) || 0
+      update(id, target, target >= current ? 1 : -1)
     }
   })
+
+  let swipeState = null
+
+  document.addEventListener(
+    'touchstart',
+    (event) => {
+      const carousel = event.target.closest('[data-carousel-id]')
+      if (!carousel) return
+      const touch = event.touches?.[0]
+      if (!touch) return
+      swipeState = {
+        id: carousel.dataset.carouselId,
+        x: touch.clientX,
+        y: touch.clientY,
+      }
+    },
+    { passive: true },
+  )
+
+  document.addEventListener(
+    'touchend',
+    (event) => {
+      if (!swipeState) return
+      const touch = event.changedTouches?.[0]
+      if (!touch) {
+        swipeState = null
+        return
+      }
+
+      const deltaX = touch.clientX - swipeState.x
+      const deltaY = touch.clientY - swipeState.y
+      const id = swipeState.id
+      swipeState = null
+
+      if (Math.abs(deltaX) < 36 || Math.abs(deltaX) <= Math.abs(deltaY)) return
+
+      if (deltaX < 0) {
+        update(id, (indexes.get(id) || 0) + 1, 1)
+      } else {
+        update(id, (indexes.get(id) || 0) - 1, -1)
+      }
+    },
+    { passive: true },
+  )
 }
 
 const bindInteractions = () => {
@@ -1972,15 +1887,15 @@ const bindInteractions = () => {
     const adminLogout = event.target.closest('[data-admin-logout]')
     const closeCompose = event.target.closest('[data-close-compose]')
     const deletePen = event.target.closest('[data-admin-delete-pen]')
-    const deleteBlog = event.target.closest('[data-admin-delete-blog]')
+    const deleteNews = event.target.closest('[data-admin-delete-news]')
     const deleteCommentByAdmin = event.target.closest('[data-admin-delete-comment]')
     const deletePenInline = event.target.closest('[data-admin-delete-pen-inline]')
-    const deleteBlogInline = event.target.closest('[data-admin-delete-blog-inline]')
+    const deleteNewsInline = event.target.closest('[data-admin-delete-news-inline]')
     const editPenTitleInline = event.target.closest('[data-admin-edit-pen-title-inline]')
     const editPenTextInline = event.target.closest('[data-admin-edit-pen-text-inline]')
-    const editBlogTitleInline = event.target.closest('[data-admin-edit-blog-title-inline]')
-    const editBlogTextInline = event.target.closest('[data-admin-edit-blog-text-inline]')
-    const editBlogCoverInline = event.target.closest('[data-admin-edit-blog-cover-inline]')
+    const editNewsTitleInline = event.target.closest('[data-admin-edit-news-title-inline]')
+    const editNewsTextInline = event.target.closest('[data-admin-edit-news-text-inline]')
+    const editNewsCoverInline = event.target.closest('[data-admin-edit-news-cover-inline]')
     const addPenImage = event.target.closest('[data-admin-add-pen-image]')
     const deletePenImage = event.target.closest('[data-admin-delete-pen-image]')
     const adminOpen = event.target.closest('[data-admin-open]')
@@ -2004,7 +1919,7 @@ const bindInteractions = () => {
     if (toggleThemeBtn) toggleTheme()
 
     const clickedAdminControl = event.target.closest(
-      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-edit-blog-title-inline],[data-admin-edit-blog-text-inline],[data-admin-edit-blog-cover-inline],[data-admin-delete-blog-inline]',
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
     if (openPen && !clickedAdminControl) {
@@ -2108,12 +2023,6 @@ const bindInteractions = () => {
       if (!post || !canManageOwnedContent(post.nickname)) return
       state.community = state.community.filter((item) => item.id !== post.id)
       saveCommunity()
-      if (isAdmin() && hasRepoConfig()) {
-        commitJsonToRepo('data/community.json', state.community, `admin: delete community ${post.id}`)
-          .then(() => render())
-          .catch((err) => alert(err.message))
-        return
-      }
       render()
     }
 
@@ -2127,12 +2036,6 @@ const bindInteractions = () => {
       post.title = nextTitle
       post.content = next
       saveCommunity()
-      if (isAdmin() && hasRepoConfig()) {
-        commitJsonToRepo('data/community.json', state.community, `admin: edit community ${post.id}`)
-          .then(() => render())
-          .catch((err) => alert(err.message))
-        return
-      }
       render()
     }
 
@@ -2159,12 +2062,6 @@ const bindInteractions = () => {
       if (!target || !canManageOwnedContent(target.nickname)) return
       state.comments[targetId] = list.filter((item) => item.id !== commentId)
       saveComments()
-      if (isAdmin() && hasRepoConfig()) {
-        commitJsonToRepo('data/comments.json', state.comments, `admin: delete comment ${targetId}/${commentId}`)
-          .then(() => render())
-          .catch((err) => alert(err.message))
-        return
-      }
       render()
     }
 
@@ -2228,67 +2125,39 @@ const bindInteractions = () => {
       const id = form?.id?.value?.trim()
       if (!id) return
       state.pens = state.pens.filter((p) => p.id !== id)
-      commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen ${id}`)
-        .then((ok) => {
-          if (ok) {
-            alert('Collection item deleted and committed.')
-            render()
-          }
-        })
-        .catch((err) => alert(err.message))
+      savePen()
+      alert('Collection item deleted from DB.')
+      render()
     }
 
-    if (deleteBlog) {
-      const form = deleteBlog.closest('[data-admin-blogs]')
+    if (deleteNews) {
+      const form = deleteNews.closest('[data-admin-news]')
       const slug = form?.slug?.value?.trim()
       if (!slug) return
-      state.blogs = state.blogs.filter((b) => b.slug !== slug)
-      commitJsonToRepo('data/blog.json', state.blogs, `admin: delete blog ${slug}`)
-        .then((ok) => {
-          if (ok) {
-            alert('Blog post deleted and committed.')
-            render()
-          }
-        })
-        .catch((err) => alert(err.message))
+      state.news = state.news.filter((b) => b.slug !== slug)
+      saveNews()
+      alert('News post deleted from DB.')
+      render()
     }
 
     if (deletePenInline) {
       if (!isAdmin()) return
       const id = deletePenInline.dataset.adminDeletePenInline
       state.pens = state.pens.filter((p) => p.id !== id)
-      if (hasRepoConfig()) {
-        commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen ${id}`)
-          .then(() => {
-            alert('Collection item deleted.')
-            location.hash = '#/collection'
-            render()
-          })
-          .catch((err) => alert(err.message))
-      } else {
-        alert('Repository not configured: deleted in runtime state only.')
-        location.hash = '#/collection'
-        render()
-      }
+      savePen()
+      alert('Collection item deleted.')
+      location.hash = '#/collection'
+      render()
     }
 
-    if (deleteBlogInline) {
+    if (deleteNewsInline) {
       if (!isAdmin()) return
-      const slug = deleteBlogInline.dataset.adminDeleteBlogInline
-      state.blogs = state.blogs.filter((b) => b.slug !== slug)
-      if (hasRepoConfig()) {
-        commitJsonToRepo('data/blog.json', state.blogs, `admin: delete blog ${slug}`)
-          .then(() => {
-            alert('Blog post deleted.')
-            location.hash = '#/news'
-            render()
-          })
-          .catch((err) => alert(err.message))
-      } else {
-        alert('Repository not configured: deleted in runtime state only.')
-        location.hash = '#/news'
-        render()
-      }
+      const slug = deleteNewsInline.dataset.adminDeleteNewsInline
+      state.news = state.news.filter((b) => b.slug !== slug)
+      saveNews()
+      alert('News post deleted.')
+      location.hash = '#/news'
+      render()
     }
 
     if (editPenTitleInline) {
@@ -2299,17 +2168,9 @@ const bindInteractions = () => {
       askAdminFields('Edit pen title', [{ name: 'name', label: 'Title', value: pen.name }]).then((values) => {
         if (!values?.name) return
         pen.name = values.name.trim()
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/pens.json', state.pens, `admin: edit pen title ${id}`)
-            .then(() => {
-              alert('Pen title updated and committed.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: updated in runtime state only.')
-          render()
-        }
+        savePen()
+        alert('Pen title updated.')
+        render()
       })
       return
     }
@@ -2332,25 +2193,17 @@ const bindInteractions = () => {
         if (!values) return
         pen.description = (values.description || '').trim()
         pen.descriptionLong = (values.descriptionLong || '').trim()
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/pens.json', state.pens, `admin: edit pen text ${id}`)
-            .then(() => {
-              alert('Pen text updated and committed.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: updated in runtime state only.')
-          render()
-        }
+        savePen()
+        alert('Pen text updated.')
+        render()
       })
       return
     }
 
-    if (editBlogTitleInline) {
+    if (editNewsTitleInline) {
       if (!isAdmin()) return
-      const slug = editBlogTitleInline.dataset.adminEditBlogTitleInline
-      const post = state.blogs.find((b) => b.slug === slug)
+      const slug = editNewsTitleInline.dataset.adminEditNewsTitleInline
+      const post = state.news.find((b) => b.slug === slug)
       if (!post) return
       askAdminFields('Edit news title', [
         { name: 'title', label: 'Title', value: post.title || '' },
@@ -2359,65 +2212,41 @@ const bindInteractions = () => {
         if (!values) return
         post.title = (values.title || '').trim()
         post.subtitle = (values.subtitle || '').trim()
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit news title ${slug}`)
-            .then(() => {
-              alert('News title/subtitle updated and committed.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: updated in runtime state only.')
-          render()
-        }
+        saveNews()
+        alert('News title/subtitle updated.')
+        render()
       })
       return
     }
 
-    if (editBlogTextInline) {
+    if (editNewsTextInline) {
       if (!isAdmin()) return
-      const slug = editBlogTextInline.dataset.adminEditBlogTextInline
-      const post = state.blogs.find((b) => b.slug === slug)
+      const slug = editNewsTextInline.dataset.adminEditNewsTextInline
+      const post = state.news.find((b) => b.slug === slug)
       if (!post) return
       askAdminFields('Edit news text', [
         { name: 'content', label: 'Content (Markdown)', value: post.content || '', multiline: true, rows: 10 },
       ]).then((values) => {
         if (!values?.content) return
         post.content = values.content
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit news text ${slug}`)
-            .then(() => {
-              alert('News text updated and committed.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: updated in runtime state only.')
-          render()
-        }
+        saveNews()
+        alert('News text updated.')
+        render()
       })
       return
     }
 
-    if (editBlogCoverInline) {
+    if (editNewsCoverInline) {
       if (!isAdmin()) return
-      const slug = editBlogCoverInline.dataset.adminEditBlogCoverInline
-      const post = state.blogs.find((b) => b.slug === slug)
+      const slug = editNewsCoverInline.dataset.adminEditNewsCoverInline
+      const post = state.news.find((b) => b.slug === slug)
       if (!post) return
       askAdminImageSource('Edit cover photo', post.coverImage || '').then((image) => {
         if (!image) return
         post.coverImage = image.trim()
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/blog.json', state.blogs, `admin: edit blog cover ${slug}`)
-            .then(() => {
-              alert('Blog cover photo updated and committed.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: updated in runtime state only.')
-          render()
-        }
+        saveNews()
+        alert('News cover photo updated.')
+        render()
       })
       return
     }
@@ -2431,17 +2260,9 @@ const bindInteractions = () => {
         if (!image) return
         pen.images ||= []
         pen.images.push(image)
-        if (hasRepoConfig()) {
-          commitJsonToRepo('data/pens.json', state.pens, `admin: add pen image ${id}`)
-            .then(() => {
-              alert('Photo added.')
-              render()
-            })
-            .catch((err) => alert(err.message))
-        } else {
-          alert('Repository not configured: added in runtime state only.')
-          render()
-        }
+        savePen()
+        alert('Photo added.')
+        render()
       })
       return
     }
@@ -2457,17 +2278,9 @@ const bindInteractions = () => {
         return
       }
       pen.images.splice(idx, 1)
-      if (hasRepoConfig()) {
-        commitJsonToRepo('data/pens.json', state.pens, `admin: delete pen image ${id}:${idx}`)
-          .then(() => {
-            alert('Photo deleted.')
-            render()
-          })
-          .catch((err) => alert(err.message))
-      } else {
-        alert('Repository not configured: deleted in runtime state only.')
-        render()
-      }
+      savePen()
+      alert('Photo deleted.')
+      render()
     }
 
     if (toggleCommunityPin) {
@@ -2477,17 +2290,8 @@ const bindInteractions = () => {
       if (!post) return
       post.pinned = !post.pinned
       saveCommunity()
-      if (hasRepoConfig()) {
-        commitJsonToRepo('data/community.json', state.community, `admin: toggle pin community ${id}`)
-          .then(() => {
-            alert('Community pin state updated and committed.')
-            render()
-          })
-          .catch((err) => alert(err.message))
-      } else {
-        alert('Repository not configured: updated in runtime state only.')
-        render()
-      }
+      alert('Community pin state updated.')
+      render()
     }
 
     if (deleteCommentByAdmin) {
@@ -2497,14 +2301,8 @@ const bindInteractions = () => {
       if (!targetId || !id) return
       state.comments[targetId] = (state.comments[targetId] || []).filter((c) => c.id !== id)
       saveComments()
-      commitJsonToRepo('data/comments.json', state.comments, `admin: delete comment ${targetId}/${id}`)
-        .then((ok) => {
-          if (ok) {
-            alert('Comment deleted and committed.')
-            render()
-          }
-        })
-        .catch((err) => alert(err.message))
+      alert('Comment deleted from DB.')
+      render()
     }
   })
 
@@ -2538,9 +2336,6 @@ const bindInteractions = () => {
             createdAt: new Date().toISOString(),
           })
           saveComments()
-          if (isAdmin() && hasRepoConfig()) {
-            await commitJsonToRepo('data/comments.json', state.comments, `admin: add reply ${targetId}/${commentId}`)
-          }
           render()
           return
         }
@@ -2675,23 +2470,9 @@ const bindInteractions = () => {
 
     const adminLogin = event.target.closest('[data-admin-login]')
     const adminEditor = event.target.closest('[data-admin-editor]')
-    const repoForm = event.target.closest('[data-admin-repo-config]')
     const pensForm = event.target.closest('[data-admin-pens]')
-    const blogsForm = event.target.closest('[data-admin-blogs]')
+    const newsForm = event.target.closest('[data-admin-news]')
     const adminCommentsForm = event.target.closest('[data-admin-comments]')
-
-    if (repoForm) {
-      event.preventDefault()
-      state.repoConfig = {
-        owner: repoForm.owner.value.trim(),
-        repo: repoForm.repo.value.trim(),
-        branch: repoForm.branch.value.trim() || 'main',
-        token: repoForm.token.value.trim(),
-      }
-      saveRepoConfig()
-      alert('Repository settings saved.')
-      return
-    }
 
     if (pensForm) {
       event.preventDefault()
@@ -2710,35 +2491,31 @@ const bindInteractions = () => {
         images: mergedImages,
       }
       upsertBy(state.pens, 'id', payload)
-      const ok = await commitJsonToRepo('data/pens.json', state.pens, `admin: upsert pen ${payload.id}`)
-      if (ok) {
-        alert('Collection item saved and committed.')
-        render()
-      }
+      savePen()
+      alert('Collection item saved to DB.')
+      render()
       return
     }
 
-    if (blogsForm) {
+    if (newsForm) {
       event.preventDefault()
-      const coverImages = await resolveImageInputs(blogsForm.coverImage.value, blogsForm.imageFile)
+      const coverImages = await resolveImageInputs(newsForm.coverImage.value, newsForm.imageFile)
       const coverImage = coverImages[0] || ''
       const payload = {
-        slug: blogsForm.slug.value.trim(),
-        title: blogsForm.title.value.trim(),
-        subtitle: blogsForm.subtitle.value.trim(),
+        slug: newsForm.slug.value.trim(),
+        title: newsForm.title.value.trim(),
+        subtitle: newsForm.subtitle.value.trim(),
         coverImage,
-        category: blogsForm.category.value.trim(),
-        tags: parseCsv(blogsForm.tags.value),
-        publishedAt: blogsForm.publishedAt.value.trim() || new Date().toISOString(),
-        readingTime: Number(blogsForm.readingTime.value || 5),
-        content: blogsForm.content.value,
+        category: newsForm.category.value.trim(),
+        tags: parseCsv(newsForm.tags.value),
+        publishedAt: newsForm.publishedAt.value.trim() || new Date().toISOString(),
+        readingTime: Number(newsForm.readingTime.value || 5),
+        content: newsForm.content.value,
       }
-      upsertBy(state.blogs, 'slug', payload)
-      const ok = await commitJsonToRepo('data/blog.json', state.blogs, `admin: upsert blog ${payload.slug}`)
-      if (ok) {
-        alert('Blog post saved and committed.')
-        render()
-      }
+      upsertBy(state.news, 'slug', payload)
+      saveNews()
+      alert('News post saved to DB.')
+      render()
       return
     }
 
@@ -2758,15 +2535,8 @@ const bindInteractions = () => {
       state.comments[targetId] ||= []
       upsertBy(state.comments[targetId], 'id', payload)
       saveComments()
-      const ok = await commitJsonToRepo(
-        'data/comments.json',
-        state.comments,
-        `admin: upsert comment ${targetId}/${payload.id}`,
-      )
-      if (ok) {
-        alert('Comment saved and committed.')
-        render()
-      }
+      alert('Comment saved to DB.')
+      render()
       return
     }
 
@@ -2843,7 +2613,7 @@ const bindInteractions = () => {
         image: adminEditor.image.value,
         savedAt: new Date().toISOString(),
       }
-      const key = payload.type === 'pen' ? 'iluvpen_draft_pen' : 'iluvpen_draft_blog'
+      const key = payload.type === 'pen' ? 'iluvpen_draft_pen' : 'iluvpen_draft_news'
       localStorage.setItem(key, JSON.stringify(payload))
       alert('Draft saved.')
     }
@@ -2935,9 +2705,6 @@ const registerServiceWorker = () => {
 
 const render = () => {
   state.currentRoute = parseHashRoute()
-  if (state.currentRoute.page === 'blog') {
-    state.currentRoute.page = 'news'
-  }
   renderLayout()
   bindAdminEntityPickers()
 }
@@ -2965,7 +2732,7 @@ const ensureTestCommentsSeed = () => {
   if (localStorage.getItem(STORAGE_KEYS.testCommentsSeeded) === '1') return false
 
   const targets = [
-    ...state.blogs.map((post) => `news:${post.slug}`),
+    ...state.news.map((post) => `news:${post.slug}`),
     ...state.community.map((post) => `community:${post.id}`),
   ]
   if (!targets.length) return false
@@ -3011,7 +2778,7 @@ const ensureTestCommentsSeed = () => {
 
 const bindAdminEntityPickers = () => {
   const penForm = document.querySelector('[data-admin-pens]')
-  const blogForm = document.querySelector('[data-admin-blogs]')
+  const newsForm = document.querySelector('[data-admin-news]')
 
   if (penForm) {
     penForm.pick.addEventListener('change', () => {
@@ -3032,23 +2799,23 @@ const bindAdminEntityPickers = () => {
     })
   }
 
-  if (blogForm) {
-    blogForm.pick.addEventListener('change', () => {
-      const selected = state.blogs.find((b) => b.slug === blogForm.pick.value)
+  if (newsForm) {
+    newsForm.pick.addEventListener('change', () => {
+      const selected = state.news.find((b) => b.slug === newsForm.pick.value)
       if (!selected) {
-        blogForm.reset()
+        newsForm.reset()
         return
       }
-      blogForm.slug.value = selected.slug
-      blogForm.title.value = selected.title
-      blogForm.subtitle.value = selected.subtitle
-      blogForm.category.value = selected.category
-      blogForm.tags.value = (selected.tags || []).join(', ')
-      blogForm.coverImage.value = selected.coverImage || ''
-      blogForm.publishedAt.value = selected.publishedAt || ''
-      blogForm.readingTime.value = selected.readingTime || 5
-      blogForm.content.value = selected.content || ''
-      syncImagePreviewForForm(blogForm)
+      newsForm.slug.value = selected.slug
+      newsForm.title.value = selected.title
+      newsForm.subtitle.value = selected.subtitle
+      newsForm.category.value = selected.category
+      newsForm.tags.value = (selected.tags || []).join(', ')
+      newsForm.coverImage.value = selected.coverImage || ''
+      newsForm.publishedAt.value = selected.publishedAt || ''
+      newsForm.readingTime.value = selected.readingTime || 5
+      newsForm.content.value = selected.content || ''
+      syncImagePreviewForForm(newsForm)
     })
   }
 
@@ -3069,19 +2836,15 @@ export const bootstrapApp = async (rootEl) => {
   }
   applyOneTimeDataReset()
   state.lang = getPreferredLanguage()
-  state.repoConfig = getSavedRepoConfig()
   applyTheme()
 
-  const [pens, blogs, community, site, commentsFromFile] = await Promise.all([
+  const [pensFromFile, newsFromFile, community, site, commentsFromFile] = await Promise.all([
     loadJson('data/pens.json'),
-    loadJson('data/blog.json'),
+    loadJson('data/news.json'),
     loadJson('data/community.json'),
     loadJson('data/site.json'),
     loadJson('data/comments.json').catch(() => ({})),
   ])
-
-  state.pens = pens
-  state.blogs = blogs
   state.site = site
 
   const currentNickname = getNickname()
@@ -3102,15 +2865,27 @@ export const bootstrapApp = async (rootEl) => {
 
   let apiCommunity = null
   let apiComments = null
+  let apiPens = null
+  let apiNews = null
   if (USE_REMOTE_DB) {
     try {
-      ;[apiCommunity, apiComments] = await Promise.all([
+      ;[apiCommunity, apiComments, apiPens, apiNews] = await Promise.all([
         apiRequest('/api/state/community'),
         apiRequest('/api/state/comments-map'),
+        apiRequest('/api/state/pen'),
+        apiRequest('/api/state/news'),
       ])
     } catch (error) {
       console.error('Failed to load remote DB state.', error)
     }
+  }
+
+  if (USE_REMOTE_DB) {
+    state.pens = Array.isArray(apiPens) ? apiPens : []
+    state.news = Array.isArray(apiNews) ? apiNews : []
+  } else {
+    state.pens = Array.isArray(pensFromFile) ? pensFromFile : []
+    state.news = Array.isArray(newsFromFile) ? newsFromFile : []
   }
 
   if (USE_REMOTE_DB) {
@@ -3147,3 +2922,4 @@ export const bootstrapApp = async (rootEl) => {
   render()
   registerServiceWorker()
 }
+

@@ -66,6 +66,30 @@ const normalizeCommunity = (row) => ({
   createdAt: new Date(row.created_at).toISOString(),
 })
 
+const normalizePen = (row) => ({
+  id: row.id,
+  name: row.name,
+  series: row.series,
+  year: Number(row.year || 0),
+  description: row.description || '',
+  descriptionLong: row.description_long || '',
+  keywords: Array.isArray(row.keywords) ? row.keywords : [],
+  images: Array.isArray(row.images) ? row.images : [],
+  createdAt: new Date(row.created_at).toISOString(),
+})
+
+const normalizeNews = (row) => ({
+  slug: row.slug,
+  title: row.title,
+  subtitle: row.subtitle || '',
+  coverImage: row.cover_image || '',
+  category: row.category || '',
+  tags: Array.isArray(row.tags) ? row.tags : [],
+  publishedAt: new Date(row.published_at).toISOString(),
+  readingTime: Number(row.reading_time || 5),
+  content: row.content || '',
+})
+
 const getCommentsMapFromDb = async () => {
   const { rows } = await pool.query(
     `select id, target_id, nickname, content, image, likes, parent_id, created_at
@@ -339,6 +363,110 @@ app.put('/api/state/community', async (req, res) => {
           Number(item.likes || 0),
           Boolean(item.pinned),
           safeIso(item.createdAt),
+        ],
+      )
+    }
+
+    await client.query('commit')
+    res.json({ ok: true, count: payload.length })
+  } catch (error) {
+    await client.query('rollback')
+    res.status(500).json({ ok: false, message: error.message })
+  } finally {
+    client.release()
+  }
+})
+
+app.get('/api/state/pen', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `select id, name, series, year, description, description_long, keywords, images, created_at
+       from pen_items
+       order by created_at desc`,
+    )
+    res.json(rows.map(normalizePen))
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.put('/api/state/pen', async (req, res) => {
+  const payload = Array.isArray(req.body) ? req.body : req.body?.pen
+  if (!Array.isArray(payload)) {
+    return res.status(400).json({ ok: false, message: 'Invalid pen payload' })
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query('delete from pen_items')
+
+    for (const item of payload) {
+      await client.query(
+        `insert into pen_items (id, name, series, year, description, description_long, keywords, images, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::timestamptz)`,
+        [
+          item.id,
+          item.name,
+          item.series,
+          Number(item.year || 0),
+          item.description || '',
+          item.descriptionLong || '',
+          JSON.stringify(Array.isArray(item.keywords) ? item.keywords : []),
+          JSON.stringify(Array.isArray(item.images) ? item.images : []),
+          safeIso(item.createdAt),
+        ],
+      )
+    }
+
+    await client.query('commit')
+    res.json({ ok: true, count: payload.length })
+  } catch (error) {
+    await client.query('rollback')
+    res.status(500).json({ ok: false, message: error.message })
+  } finally {
+    client.release()
+  }
+})
+
+app.get('/api/state/news', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `select slug, title, subtitle, cover_image, category, tags, published_at, reading_time, content
+       from news_posts
+       order by published_at desc`,
+    )
+    res.json(rows.map(normalizeNews))
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.put('/api/state/news', async (req, res) => {
+  const payload = Array.isArray(req.body) ? req.body : req.body?.news
+  if (!Array.isArray(payload)) {
+    return res.status(400).json({ ok: false, message: 'Invalid news payload' })
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query('delete from news_posts')
+
+    for (const item of payload) {
+      await client.query(
+        `insert into news_posts (slug, title, subtitle, cover_image, category, tags, published_at, reading_time, content)
+         values ($1, $2, $3, $4, $5, $6::jsonb, $7::timestamptz, $8, $9)`,
+        [
+          item.slug,
+          item.title,
+          item.subtitle || '',
+          item.coverImage || '',
+          item.category || '',
+          JSON.stringify(Array.isArray(item.tags) ? item.tags : []),
+          safeIso(item.publishedAt),
+          Number(item.readingTime || 5),
+          item.content || '',
         ],
       )
     }
