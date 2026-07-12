@@ -1429,6 +1429,13 @@ const renderNewsThumbnailCarousel = (post, prefix = 'news-thumb') =>
     alt: post.title,
   })
 
+const renderHashtagLine = (tags = []) =>
+  (Array.isArray(tags) ? tags : [])
+    .map((tag) => String(tag || '').trim())
+    .filter(Boolean)
+    .map((tag) => `#${escapeHtml(tag.replace(/^#/, ''))}`)
+    .join(' ')
+
 const sortByYearThenCreatedAtDesc = (a, b) => b.year - a.year || new Date(b.createdAt) - new Date(a.createdAt)
 
 const renderHome = () => {
@@ -1640,7 +1647,7 @@ const renderNewsList = () => {
             <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
             <h3>${escapeHtml(post.title)}</h3>
             <p>${escapeHtml(post.subtitle)}</p>
-            <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
+            <p class="muted">${renderHashtagLine(post.tags)}</p>
             <a href="#/news/${post.slug}" class="text-link">Open article</a>
             ${
               isAdmin()
@@ -1670,7 +1677,7 @@ const renderNewsDetail = (slug) => {
       <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min read</p>
       <img src="${escapeHtml(getFirstImageValue(post.coverImage))}" alt="${escapeHtml(post.title)}" class="article-cover" />
       <div class="article-content">${markdownToHtml(post.content)}</div>
-      <p class="muted">Tags: ${(post.tags || []).map(escapeHtml).join(', ')}</p>
+      <p class="muted">${renderHashtagLine(post.tags)}</p>
       ${
         isAdmin()
               ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-news-title-inline="${post.slug}">Edit title</button><button type="button" class="text-btn" data-admin-edit-news-text-inline="${post.slug}">Edit text</button><button type="button" class="text-btn" data-admin-edit-news-cover-inline="${post.slug}">Edit cover photo</button><button type="button" class="text-btn danger" data-admin-delete-news-inline="${post.slug}">Delete</button></div>`
