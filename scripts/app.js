@@ -693,16 +693,43 @@ const ensureImagePreviewElement = (form) => {
   if (!hasImageControls) return null
 
   let preview = form.querySelector('[data-image-preview]')
-  if (preview) return preview
+  if (!preview) {
+    preview = document.createElement('div')
+    preview.className = 'image-preview'
+    preview.dataset.imagePreview = 'true'
+    preview.hidden = true
+    preview.innerHTML = '<p class="muted">Thumbnail preview</p><img alt="Image preview" loading="lazy" />'
+  }
 
-  preview = document.createElement('div')
-  preview.className = 'image-preview'
-  preview.dataset.imagePreview = 'true'
-  preview.hidden = true
-  preview.innerHTML = '<p class="muted">Thumbnail preview</p><img alt="Image preview" loading="lazy" />'
+  const firstImageControl = form.querySelector(
+    'textarea[name="images"], input[name="imageUrl"], input[name="image"], input[name="coverImage"], input[name="imageFile"]',
+  )
+
+  if (firstImageControl) {
+    const imageFieldsContainer = firstImageControl.closest('.image-fields')
+    if (imageFieldsContainer && form.contains(imageFieldsContainer)) {
+      const anchor = imageFieldsContainer.firstElementChild || imageFieldsContainer
+      if (preview !== anchor || preview.parentElement !== imageFieldsContainer) {
+        imageFieldsContainer.insertBefore(preview, anchor)
+      }
+      return preview
+    }
+
+    const anchorLabel = firstImageControl.closest('label')
+    const anchor = anchorLabel && form.contains(anchorLabel) ? anchorLabel : firstImageControl
+    if (preview !== anchor || preview.parentElement !== form) {
+      form.insertBefore(preview, anchor)
+    }
+    return preview
+  }
 
   const submitActions = form.querySelector('.editor-actions:last-of-type')
-  if (submitActions && submitActions.parentElement === form) {
+  if (!submitActions) {
+    form.append(preview)
+    return preview
+  }
+
+  if (submitActions.parentElement === form) {
     form.insertBefore(preview, submitActions)
   } else {
     form.append(preview)
