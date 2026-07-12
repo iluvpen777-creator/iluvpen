@@ -7,6 +7,7 @@
   --line: rgba(34, 34, 34, 0.09);
   --shadow: 0 16px 40px rgba(25, 20, 15, 0.08);
   --radius: 14px;
+  --keyboard-offset: 0px;
 }
 
 :root[data-theme='dark'] {
@@ -53,7 +54,7 @@ img {
 .shell {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 20px;
+  padding: clamp(12px, 1.8vw, 20px);
 }
 
 .page-enter {
@@ -192,6 +193,7 @@ main {
   border-radius: var(--radius);
   background: color-mix(in oklab, var(--card), transparent 4%);
   box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
 }
 
 .reveal {
@@ -538,6 +540,12 @@ main {
   width: 100%;
 }
 
+.comment-image {
+  width: clamp(120px, 28vw, 170px);
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
 .social-post .community-image {
   width: min(340px, 48%);
   margin: 12px auto 10px 0;
@@ -569,6 +577,7 @@ select {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 12px;
+  font-size: 16px;
 }
 
 input[type='file'] {
@@ -891,7 +900,12 @@ select:focus {
   background: rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
-  padding: 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(calc(12px + var(--keyboard-offset)), env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
 }
 
 .compose-sheet {
@@ -901,6 +915,9 @@ select:focus {
   background: var(--card);
   padding: 18px;
   box-shadow: var(--shadow);
+  max-height: calc(100dvh - 24px - var(--keyboard-offset));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .lightbox-inner {
@@ -968,6 +985,16 @@ select:focus {
     padding: 18px;
   }
 
+  .compose-modal {
+    place-items: end stretch;
+  }
+
+  .compose-sheet {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    max-height: calc(100dvh - 12px - var(--keyboard-offset));
+  }
+
   .section-head {
     align-items: start;
     flex-direction: column;
@@ -1012,6 +1039,12 @@ select:focus {
 
   .reply-list {
     max-height: min(24vh, 180px);
+  }
+}
+
+@supports not (height: 100dvh) {
+  .compose-sheet {
+    max-height: calc(100vh - 24px - var(--keyboard-offset));
   }
 }
 

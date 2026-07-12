@@ -785,6 +785,29 @@ const apiRequest = async (path, options = {}) => {
   return response.json()
 }
 
+const updateKeyboardInset = () => {
+  const viewport = window.visualViewport
+  if (!viewport) {
+    document.documentElement.style.setProperty('--keyboard-offset', '0px')
+    return
+  }
+
+  const keyboardHeight = Math.max(0, window.innerHeight - (viewport.height + viewport.offsetTop))
+  document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardHeight)}px`)
+}
+
+const keepFocusedFieldVisible = (target) => {
+  if (!(target instanceof HTMLElement)) return
+  if (!(target.matches('input, textarea, select'))) return
+  if (target.matches('input[type="file"], input[type="hidden"]')) return
+
+  const run = () => {
+    target.scrollIntoView({ block: 'center', inline: 'nearest' })
+  }
+
+  window.setTimeout(run, 120)
+}
+
 const loadJson = async (path) => {
   const res = await fetch(`${BASE_URL}${path}`)
   if (!res.ok) throw new Error(`Failed to load ${path}`)
@@ -2901,6 +2924,11 @@ const bindInteractions = () => {
       )
       .join('')
   })
+
+  document.addEventListener('focusin', (event) => {
+    if (!window.matchMedia('(max-width: 920px)').matches) return
+    keepFocusedFieldVisible(event.target)
+  })
 }
 
 const registerServiceWorker = () => {
@@ -3132,6 +3160,13 @@ export const bootstrapApp = async (rootEl) => {
 
   bindCarousel()
   bindInteractions()
+  updateKeyboardInset()
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateKeyboardInset)
+    window.visualViewport.addEventListener('scroll', updateKeyboardInset)
+  }
+  window.addEventListener('orientationchange', updateKeyboardInset)
 
   window.addEventListener('hashchange', render)
   window.addEventListener('popstate', render)
