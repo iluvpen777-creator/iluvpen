@@ -1050,7 +1050,6 @@ const renderHome = () => {
       <div class="hero-content">
         <p class="eyebrow">Premium Archive</p>
         <h1>i_luv_pen</h1>
-        <p class="lead">collection, news, community by james koh</p>
         <div class="hero-actions">
           <a class="btn" href="#/collection">View Collection</a>
           <a class="btn ghost" href="#/news">Latest News</a>
