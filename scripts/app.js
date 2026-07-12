@@ -3164,7 +3164,23 @@ const registerServiceWorker = () => {
 const render = () => {
   state.currentRoute = parseHashRoute()
   renderLayout()
+  enhanceRenderedArticleMarkdown()
   bindAdminEntityPickers()
+}
+
+const enhanceRenderedArticleMarkdown = () => {
+  const article = document.querySelector('.article-content')
+  if (!(article instanceof HTMLElement)) return
+  const source = article.innerHTML
+  let enhanced = source
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*]+)\*(?=[\s).,!?:;]|$)/gm, '$1<em>$2</em>')
+    .replace(/(^|[\s(])_([^_]+)_(?=[\s).,!?:;]|$)/gm, '$1<em>$2</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+
+  if (enhanced === source) return
+  article.innerHTML = enhanced
 }
 
 const parseLines = (value) =>
