@@ -603,7 +603,7 @@ const registerNickname = async (nickname, password, profileImage = '') => {
 
 const loginNickname = async (nickname, password) => {
   if (isProtectedAdminNickname(nickname) && password === 'iluvpen-admin') {
-    return { ok: true, nickname: 'i_luv_pen', profileImage: '' }
+    return { ok: true, nickname: 'i_luv_pen', profileImage: PROFILE_AVATAR_URL }
   }
 
   if (USE_REMOTE_DB) {
@@ -2793,7 +2793,7 @@ const bindInteractions = () => {
       if (nickname === 'i_luv_pen' && value === 'iluvpen-admin') {
         localStorage.setItem(STORAGE_KEYS.nickname, 'i_luv_pen')
         localStorage.setItem(STORAGE_KEYS.admin, 'true')
-        state.userProfileImage = ''
+        state.userProfileImage = PROFILE_AVATAR_URL
         render()
       } else {
         alert('Incorrect admin nickname or password.')
@@ -3069,11 +3069,15 @@ export const bootstrapApp = async (rootEl) => {
 
   const currentNickname = getNickname()
   if (currentNickname) {
+    if (isProtectedAdminNickname(currentNickname)) {
+      state.userProfileImage = PROFILE_AVATAR_URL
+    } else {
     try {
       const profile = await getUserProfile(currentNickname)
       state.userProfileImage = profile.profileImage || ''
     } catch {
       state.userProfileImage = isBlockedLocalMode() ? '' : getLocalUserProfileImage(currentNickname)
+    }
     }
   } else {
     state.userProfileImage = ''
