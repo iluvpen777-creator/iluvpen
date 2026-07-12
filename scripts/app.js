@@ -46,6 +46,7 @@ const state = {
   community: [],
   site: null,
   comments: {},
+  commentSorts: {},
   lang: 'en',
   currentRoute: { page: 'home', param: '' },
   accountMenuOpen: false,
@@ -783,8 +784,29 @@ const getSortedCommunity = (sort) => {
   return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
 
+const getCommentSort = (targetId) => state.commentSorts[targetId] || 'latest'
+
+const getSortedComments = (targetId) => {
+  const arr = [...getComments(targetId)]
+  const sort = getCommentSort(targetId)
+
+  if (sort === 'oldest') {
+    return arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+  }
+
+  if (sort === 'likes') {
+    return arr.sort((a, b) => {
+      const likeGap = Number(b.likes || 0) - Number(a.likes || 0)
+      if (likeGap !== 0) return likeGap
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+  }
+
+  return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+}
+
 const renderCommentList = (targetId) => {
-  const comments = getComments(targetId)
+  const comments = getSortedComments(targetId)
   if (!comments.length) return '<p class="muted">Be the first to leave a comment.</p>'
 
   return `<ul class="comment-list">${comments
@@ -1415,7 +1437,17 @@ const renderCommunityDetail = (postId) => {
         }
       </div>
       <div class="comment-block">
-        <h4>Comments ${getComments(`community:${post.id}`).length}</h4>
+        <div class="comment-block-head">
+          <h4>Comments ${getComments(`community:${post.id}`).length}</h4>
+          <label class="comment-sort-label">
+            Sort
+            <select data-comment-sort="community:${post.id}">
+              <option value="oldest" ${getCommentSort(`community:${post.id}`) === 'oldest' ? 'selected' : ''}>등록순</option>
+              <option value="latest" ${getCommentSort(`community:${post.id}`) === 'latest' ? 'selected' : ''}>최신순</option>
+              <option value="likes" ${getCommentSort(`community:${post.id}`) === 'likes' ? 'selected' : ''}>좋아요 많은 순</option>
+            </select>
+          </label>
+        </div>
         ${renderCommentList(`community:${post.id}`)}
         ${renderCommentComposer(`community:${post.id}`)}
       </div>
@@ -1790,10 +1822,12 @@ const renderLayout = () => {
   if (state.currentRoute.page === 'admin') pageHtml = renderAdmin()
   if (!pageHtml) pageHtml = renderHome()
 
+  const showQuickLinks = state.currentRoute.page === 'home'
+
   app.innerHTML = localizeHtml(`
     <div class="shell page-enter">
       ${renderHeader()}
-      ${renderQuickLinks()}
+      ${showQuickLinks ? renderQuickLinks() : ''}
       <main id="main-content">${pageHtml}</main>
       ${renderFooter()}
     </div>
@@ -2699,6 +2733,7 @@ const bindInteractions = () => {
   document.addEventListener('change', (event) => {
     const collectionFilter = event.target.closest('[data-collection-filter]')
     const communitySort = event.target.closest('[data-community-sort]')
+    const commentSortSelect = event.target.matches('[data-comment-sort]') ? event.target : null
     const languageSelect = event.target.closest('[data-language-select]')
     const imageFileInput = event.target.matches('input[name="imageFile"]') ? event.target : null
 
@@ -2735,6 +2770,14 @@ const bindInteractions = () => {
       qs.set('sort', sort)
       history.replaceState({}, '', `${location.pathname}?${qs.toString()}${location.hash}`)
       render()
+    }
+
+    if (commentSortSelect) {
+      const targetId = commentSortSelect.dataset.commentSort
+      if (targetId) {
+        state.commentSorts[targetId] = commentSortSelect.value
+        render()
+      }
     }
   })
 
