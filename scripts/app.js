@@ -24,6 +24,9 @@ const requireSyncedDbMode = () => {
 const PROFILE_AVATAR_URL = new URL('../images/profile.jpg', import.meta.url).href
 const DEFAULT_USER_AVATAR =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23d5d5d5"/><circle cx="32" cy="24" r="12" fill="%23f6f6f6"/><path d="M12 54c4-10 12-16 20-16s16 6 20 16" fill="%23f6f6f6"/></svg>'
+const IMAGE_UPLOAD_MAX_EDGE = 2560
+const IMAGE_UPLOAD_TARGET_BYTES = 900 * 1024
+const IMAGE_UPLOAD_MAX_SOURCE_BYTES = 40 * 1024 * 1024
 
 const STORAGE_KEYS = {
   theme: 'iluvpen_theme',
@@ -469,6 +472,94 @@ const fileToDataUrl = (file) =>
     reader.readAsDataURL(file)
   })
 
+const blobToDataUrl = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(new Error('Unable to convert optimized image.'))
+    reader.readAsDataURL(blob)
+  })
+
+const loadImageFromFile = (file) =>
+  new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Unable to decode the selected image.'))
+    }
+    image.src = objectUrl
+  })
+
+const canvasToBlob = (canvas, mimeType, quality) =>
+  new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Image optimization failed.'))
+        return
+      }
+      resolve(blob)
+    }, mimeType, quality)
+  })
+
+const optimizeImageFileToDataUrl = async (file) => {
+  if (file.size > IMAGE_UPLOAD_MAX_SOURCE_BYTES) {
+    alert('Image file is too large. Please use a file under 40MB.')
+    return ''
+  }
+
+  if (file.type === 'image/gif') {
+    return fileToDataUrl(file)
+  }
+
+  if (file.size <= IMAGE_UPLOAD_TARGET_BYTES) {
+    return fileToDataUrl(file)
+  }
+
+  const source = await loadImageFromFile(file)
+  const startRatio = Math.min(1, IMAGE_UPLOAD_MAX_EDGE / Math.max(source.width, source.height))
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+  if (!context) {
+    return fileToDataUrl(file)
+  }
+
+  const qualitySteps = [0.82, 0.72, 0.62, 0.52, 0.42]
+  let ratio = startRatio
+  let best = null
+
+  for (let pass = 0; pass < 5; pass += 1) {
+    const width = Math.max(1, Math.round(source.width * ratio))
+    const height = Math.max(1, Math.round(source.height * ratio))
+    canvas.width = width
+    canvas.height = height
+    context.clearRect(0, 0, width, height)
+    context.drawImage(source, 0, 0, width, height)
+
+    for (const quality of qualitySteps) {
+      const blob = await canvasToBlob(canvas, 'image/webp', quality)
+      if (!best || blob.size < best.size) {
+        best = blob
+      }
+      if (blob.size <= IMAGE_UPLOAD_TARGET_BYTES) {
+        return blobToDataUrl(blob)
+      }
+    }
+
+    ratio *= 0.85
+  }
+
+  if (best) {
+    return blobToDataUrl(best)
+  }
+
+  return fileToDataUrl(file)
+}
+
 const parseImageValues = (value) => {
   if (Array.isArray(value)) {
     return value.map((item) => String(item || '').trim()).filter(Boolean)
@@ -505,16 +596,15 @@ const getSelectedFileLabel = (fileInput) => {
 
 const resolveImageInputs = async (urlValue, fileInput) => {
   const urls = parseImageValues(urlValue)
-  if (urls.length) return urls
-
   const files = Array.from(fileInput?.files || [])
-  if (!files.length) return []
+  if (!files.length) return urls
   if (files.some((file) => !file.type.startsWith('image/'))) {
     alert('Only image files can be uploaded.')
     return []
   }
 
-  return Promise.all(files.map((file) => fileToDataUrl(file)))
+  const optimized = await Promise.all(files.map((file) => optimizeImageFileToDataUrl(file)))
+  return [...optimized.filter(Boolean), ...urls]
 }
 
 const resolveImageInput = async (urlValue, fileInput) => {
@@ -537,7 +627,7 @@ const getFormImagePreviewSource = async (form) => {
     return fileToDataUrl(file)
   }
 
-  const urlInput = form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"]')
+  const urlInput = form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="coverImage"]')
   const byUrl = getFirstImageValue(urlInput?.value || '')
   if (byUrl) return byUrl
 
@@ -553,7 +643,7 @@ const ensureImagePreviewElement = (form) => {
   if (!form) return null
   const hasImageControls =
     form.querySelector('input[name="imageFile"]') ||
-    form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"]') ||
+    form.querySelector('input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="coverImage"]') ||
     form.querySelector('textarea[name="images"]')
   if (!hasImageControls) return null
 
@@ -567,7 +657,7 @@ const ensureImagePreviewElement = (form) => {
   }
 
   const firstImageControl = form.querySelector(
-    'textarea[name="images"], input[name="imageUrl"], input[name="image"], input[name="coverImage"], input[name="imageFile"]',
+    'textarea[name="images"], input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="coverImage"], input[name="imageFile"]',
   )
 
   if (firstImageControl) {
@@ -700,7 +790,7 @@ const isAdmin = () => {
 const getPersistFailureMessage = (error, fallbackMessage) => {
   const message = String(error?.message || '')
   if (message.includes('413') || /too large/i.test(message)) {
-    return 'Image is too large. Please use a smaller image file.'
+    return 'Image is still too large after optimization. Try fewer photos or lower-resolution files.'
   }
   return fallbackMessage
 }
@@ -1046,6 +1136,73 @@ const askAdminImageSource = (title, initialUrl = '') =>
 
     document.body.append(modal)
     syncImagePreviewForForm(adminImageForm)
+  })
+
+const askAdminImagesSource = (title, initialValue = '') =>
+  new Promise((resolve) => {
+    const modal = document.createElement('div')
+    modal.className = 'compose-modal'
+    modal.innerHTML = `
+      <div class="compose-sheet">
+        <div class="section-head">
+          <h3>${escapeHtml(title)}</h3>
+          <button type="button" class="icon-btn" data-close-admin-images-modal>Close</button>
+        </div>
+        <form class="comment-form" data-admin-images-form>
+          <label>
+            Cover image URLs (optional, one per line)
+            <textarea name="images" rows="5" placeholder="https://...">${escapeHtml(initialValue)}</textarea>
+          </label>
+          <label>
+            Cover image files (optional)
+            <input name="imageFile" type="file" accept="image/*" multiple hidden />
+            <div class="editor-actions">
+              <button type="button" class="btn ghost" data-pick-admin-images-file>Choose files</button>
+              <span class="muted" data-admin-images-file-name>No file chosen</span>
+            </div>
+          </label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save</button>
+            <button type="button" class="btn ghost" data-close-admin-images-modal>Cancel</button>
+          </div>
+        </form>
+      </div>
+    `
+
+    const close = (value = null) => {
+      modal.remove()
+      resolve(value)
+    }
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.closest('[data-close-admin-images-modal]')) {
+        close(null)
+      }
+    })
+
+    const fileInput = modal.querySelector('input[name="imageFile"]')
+    const fileName = modal.querySelector('[data-admin-images-file-name]')
+    const picker = modal.querySelector('[data-pick-admin-images-file]')
+    const form = modal.querySelector('[data-admin-images-form]')
+
+    picker.addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', () => {
+      fileName.textContent = getSelectedFileLabel(fileInput)
+      syncImagePreviewForForm(form)
+    })
+    form.images.addEventListener('input', () => {
+      syncImagePreviewForForm(form)
+    })
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const values = await resolveImageInputs(form.images.value, form.imageFile)
+      if (!values.length) return
+      close(values)
+    })
+
+    document.body.append(modal)
+    syncImagePreviewForForm(form)
   })
 
 const renderImageCarousel = ({ id, images = [], alt = 'Image' }) => {
@@ -1550,7 +1707,7 @@ const renderAdmin = () => {
           <label>Subtitle<input name="subtitle" required /></label>
           <label>Category<input name="category" required /></label>
           <label>Tags (comma-separated)<input name="tags" /></label>
-          <label>Cover image URL (optional)<input name="coverImage" type="url" /></label>
+          <label>Cover image URLs (optional, one per line)<textarea name="coverImage" rows="4" placeholder="https://..."></textarea></label>
           <label>
             Cover image file (optional)
             <input name="imageFile" type="file" accept="image/*" multiple hidden />
@@ -2340,16 +2497,7 @@ const bindInteractions = () => {
       const slug = editNewsCoverInline.dataset.adminEditNewsCoverInline
       const post = state.news.find((b) => b.slug === slug)
       if (!post) return
-      askAdminFields('Edit cover photos', [
-        {
-          name: 'coverImage',
-          label: 'Cover image URLs (one per line)',
-          value: post.coverImage || '',
-          multiline: true,
-          rows: 5,
-        },
-      ]).then((values) => {
-        const images = parseImageValues(values?.coverImage || '')
+      askAdminImagesSource('Edit cover photos', post.coverImage || '').then((images) => {
         if (!images.length) return
         post.coverImage = images.join('\n')
         saveNews()
@@ -2783,7 +2931,7 @@ const bindInteractions = () => {
 
   document.addEventListener('input', (event) => {
     const imageInput = event.target.matches(
-      'input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="images"]',
+      'input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="coverImage"], textarea[name="images"]',
     )
       ? event.target
       : null

@@ -8,7 +8,7 @@ dotenv.config()
 
 const app = express()
 const port = Number(process.env.PORT || process.env.API_PORT || 8787)
-const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '25mb'
 
 const corsOrigin = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((v) => v.trim())
