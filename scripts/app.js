@@ -1045,16 +1045,18 @@ const renderHome = () => {
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
   return `
-  <section class="hero hero-feature reveal" ${newestCollectionPen?.images?.[0] ? `style="--hero-image: url('${escapeHtml(newestCollectionPen.images[0])}')"` : ''}>
-    <div class="hero-content">
-      <p class="eyebrow">Premium Archive</p>
-      <h1>i_luv_pen</h1>
-      <p class="lead">collection, news, community by james koh</p>
-      <div class="hero-actions">
-        <a class="btn" href="#/collection">View Collection</a>
-        <a class="btn ghost" href="#/news">Latest News</a>
+  <section class="hero-shell reveal">
+    <section class="hero hero-feature" ${newestCollectionPen?.images?.[0] ? `style="--hero-image: url('${escapeHtml(newestCollectionPen.images[0])}')"` : ''}>
+      <div class="hero-content">
+        <p class="eyebrow">Premium Archive</p>
+        <h1>i_luv_pen</h1>
+        <p class="lead">collection, news, community by james koh</p>
+        <div class="hero-actions">
+          <a class="btn" href="#/collection">View Collection</a>
+          <a class="btn ghost" href="#/news">Latest News</a>
+        </div>
       </div>
-    </div>
+    </section>
     <p class="hero-caption">${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</p>
   </section>
 
