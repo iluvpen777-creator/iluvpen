@@ -221,15 +221,15 @@ main {
   background-image:
     linear-gradient(
       90deg,
-      rgba(255, 255, 255, 1) 0%,
-      rgba(255, 255, 255, 1) 16%,
-      rgba(255, 255, 255, 0.9) 24%,
-      rgba(255, 255, 255, 0.55) 30%,
-      rgba(255, 255, 255, 0) 33%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.88) 34%,
+      rgba(255, 255, 255, 0.56) 56%,
+      rgba(255, 255, 255, 0.12) 76%,
       rgba(255, 255, 255, 0) 100%
     ),
     var(--hero-image);
   background-size: cover;
+  background-repeat: no-repeat;
   background-position: center;
   align-content: space-between;
 }
@@ -436,6 +436,8 @@ main {
 }
 
 .carousel-image {
+  position: relative;
+  z-index: 1;
   width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
@@ -452,6 +454,7 @@ main {
 
 .carousel-nav {
   position: absolute;
+  z-index: 3;
   top: 50%;
   transform: translateY(-50%);
   border: 0;
@@ -475,6 +478,7 @@ main {
   justify-content: center;
   gap: 6px;
   position: absolute;
+  z-index: 3;
   left: 0;
   right: 0;
   bottom: 10px;
@@ -1056,14 +1060,14 @@ select:focus {
     background-image:
       linear-gradient(
         90deg,
-        rgba(255, 255, 255, 1) 0%,
-        rgba(255, 255, 255, 1) 16%,
-        rgba(255, 255, 255, 0.9) 24%,
-        rgba(255, 255, 255, 0.55) 30%,
-        rgba(255, 255, 255, 0) 33%,
+        rgba(255, 255, 255, 0.96) 0%,
+        rgba(255, 255, 255, 0.9) 42%,
+        rgba(255, 255, 255, 0.62) 68%,
+        rgba(255, 255, 255, 0.22) 88%,
         rgba(255, 255, 255, 0) 100%
       ),
       var(--hero-image);
+    background-repeat: no-repeat;
     background-position: right center;
   }
 
