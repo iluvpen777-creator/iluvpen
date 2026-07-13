@@ -183,6 +183,13 @@ const normalizeNews = (row) => ({
   content: row.content || '',
 })
 
+const normalizeSite = (value) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value
+  }
+  return {}
+}
+
 const getCommentsMapFromDb = async () => {
   const { rows } = await pool.query(
     `select id, target_id, nickname, content, image, likes, parent_id, created_at
@@ -650,6 +657,47 @@ app.put('/api/state/news', requireAdminAuth, async (req, res) => {
     res.status(500).json({ ok: false, message: error.message })
   } finally {
     client.release()
+  }
+})
+
+app.get('/api/state/site', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `select value_json
+       from site_settings
+       where setting_key = 'site'
+       limit 1`,
+    )
+
+    if (!result.rowCount) {
+      return res.json({})
+    }
+
+    return res.json(normalizeSite(result.rows[0].value_json))
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.put('/api/state/site', requireAdminAuth, async (req, res) => {
+  const payload = req.body?.site ?? req.body
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ ok: false, message: 'Invalid site payload' })
+  }
+
+  try {
+    const normalized = normalizeSite(payload)
+    await pool.query(
+      `insert into site_settings (setting_key, value_json, updated_at)
+       values ('site', $1::jsonb, now())
+       on conflict (setting_key)
+       do update set value_json = excluded.value_json, updated_at = now()`,
+      [JSON.stringify(normalized)],
+    )
+
+    return res.json({ ok: true, site: normalized })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
   }
 })
 

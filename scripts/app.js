@@ -39,6 +39,7 @@ const STORAGE_KEYS = {
   cachedNews: 'iluvpen_cached_news',
   cachedCommunity: 'iluvpen_cached_community',
   cachedComments: 'iluvpen_cached_comments',
+  cachedSite: 'iluvpen_cached_site',
   testCommentsSeeded: 'iluvpen_test_comments_seeded',
   admin: 'iluvpen_admin_auth',
   adminToken: 'iluvpen_admin_token',
@@ -1212,6 +1213,25 @@ const saveNews = () => {
   })
 }
 
+const saveSite = () => {
+  if (isBlockedLocalMode()) {
+    warnRemoteDbRequired()
+    return
+  }
+  if (!USE_REMOTE_DB) return
+
+  apiRequest('/api/state/site', {
+    method: 'PUT',
+    headers: getAdminRequestHeaders(),
+    body: JSON.stringify({ site: state.site || {} }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedSite, state.site || {})
+  }).catch((error) => {
+    console.error('Failed to save site config to DB:', error)
+    alert(getPersistFailureMessage(error, 'Failed to save site config to DB. Please check API/DB status.'))
+  })
+}
+
 const getSortedCommunity = (sort) => {
   const arr = [...state.community]
   if (sort === 'popular') return arr.sort((a, b) => b.likes - a.likes)
@@ -1738,6 +1758,8 @@ const sortByYearThenCreatedAtDesc = (a, b) => b.year - a.year || new Date(b.crea
 const renderHome = () => {
   const latestPens = [...state.pens].sort(sortByYearThenCreatedAtDesc).slice(0, 4)
   const newestCollectionPen = [...state.pens].sort(sortByYearThenCreatedAtDesc)[0]
+  const siteHeroImage = getFirstImageValue(state.site?.homeHeroImage || '')
+  const heroImage = siteHeroImage || newestCollectionPen?.images?.[0] || ''
   const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
@@ -1752,7 +1774,7 @@ const renderHome = () => {
 
   return `
   <section class="hero-shell reveal">
-    <section class="hero hero-feature" ${newestCollectionPen?.images?.[0] ? `style="--hero-image: url('${escapeHtml(newestCollectionPen.images[0])}')"` : ''}>
+    <section class="hero hero-feature" ${heroImage ? `style="--hero-image: url('${escapeHtml(heroImage)}')"` : ''}>
       <div class="hero-content">
         <p class="eyebrow">Premium Archive</p>
         <h1>i_luv_pen</h1>
@@ -1763,7 +1785,7 @@ const renderHome = () => {
         </div>
       </div>
     </section>
-    <p class="hero-caption">${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</p>
+    <p class="hero-caption">${escapeHtml(siteHeroImage ? 'Custom Home Hero' : newestCollectionPen?.name || 'Featured Pen')}</p>
   </section>
 
   <section class="section reveal">
@@ -2176,6 +2198,29 @@ const renderAdmin = () => {
           <div class="editor-actions">
             <button type="submit" class="btn">Add/Update + Save</button>
             <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Save</button>
+          </div>
+          </form>
+        </div>
+      </details></article>
+
+      <article class="card"><details class="admin-panel-fold">
+        <summary class="admin-panel-toggle">Home Hero Image</summary>
+        <div class="card-body">
+          <form class="admin-editor" data-admin-site>
+          <label>Home hero image URL (optional)
+            <textarea name="homeHeroImage" rows="4" placeholder="https://... (first line used)">${escapeHtml(state.site?.homeHeroImage || '')}</textarea>
+          </label>
+          <label>
+            Home hero image file (optional)
+            <input name="imageFile" type="file" accept="image/*" hidden />
+            <div class="editor-actions file-picker">
+              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
+              <span class="muted" data-file-name>No file chosen</span>
+            </div>
+          </label>
+          <p class="muted">If empty, the latest collection photo is used automatically.</p>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save Home Hero</button>
           </div>
           </form>
         </div>
@@ -3130,12 +3175,12 @@ const bindInteractions = () => {
       const id = addPenImage.dataset.adminAddPenImage
       const pen = state.pens.find((p) => p.id === id)
       if (!pen) return
-      askAdminImageSource('Add photo').then((image) => {
-        if (!image) return
+      askAdminImagesSource('Add photos').then((images) => {
+        if (!images?.length) return
         pen.images ||= []
-        pen.images.push(image)
+        pen.images.push(...images)
         savePen()
-        alert('Photo added.')
+        alert(images.length > 1 ? `${images.length} photos added.` : 'Photo added.')
         render()
       })
       return
@@ -3399,8 +3444,22 @@ const bindInteractions = () => {
     const adminLogin = event.target.closest('[data-admin-login]')
     const adminEditor = event.target.closest('[data-admin-editor]')
     const pensForm = event.target.closest('[data-admin-pens]')
+    const siteForm = event.target.closest('[data-admin-site]')
     const newsForm = event.target.closest('[data-admin-news]')
     const adminCommentsForm = event.target.closest('[data-admin-comments]')
+
+    if (siteForm) {
+      event.preventDefault()
+      const images = await resolveImageInputs(siteForm.homeHeroImage.value, siteForm.imageFile)
+      state.site = {
+        ...(state.site && typeof state.site === 'object' ? state.site : {}),
+        homeHeroImage: images[0] || '',
+      }
+      saveSite()
+      alert('Home hero image saved.')
+      render()
+      return
+    }
 
     if (pensForm) {
       event.preventDefault()
@@ -3859,7 +3918,7 @@ export const bootstrapApp = async (rootEl) => {
     loadJson('data/site.json'),
     loadJson('data/comments.json').catch(() => ({})),
   ])
-  state.site = site
+  state.site = site && typeof site === 'object' && !Array.isArray(site) ? site : {}
 
   const currentNickname = getNickname()
   if (currentNickname) {
@@ -3881,12 +3940,14 @@ export const bootstrapApp = async (rootEl) => {
   let apiComments = null
   let apiPens = null
   let apiNews = null
+  let apiSite = null
   if (USE_REMOTE_DB) {
-    const [communityResult, commentsResult, pensResult, newsResult] = await Promise.allSettled([
+    const [communityResult, commentsResult, pensResult, newsResult, siteResult] = await Promise.allSettled([
       apiRequest('/api/state/community'),
       apiRequest('/api/state/comments-map'),
       apiRequest('/api/state/pen'),
       apiRequest('/api/state/news'),
+      apiRequest('/api/state/site'),
     ])
 
     if (communityResult.status === 'fulfilled') apiCommunity = communityResult.value
@@ -3901,14 +3962,22 @@ export const bootstrapApp = async (rootEl) => {
     if (newsResult.status === 'fulfilled') apiNews = newsResult.value
     else console.error('Failed to load remote news state.', newsResult.reason)
 
+    if (siteResult.status === 'fulfilled') apiSite = siteResult.value
+    else console.error('Failed to load remote site config.', siteResult.reason)
+
     if (
       communityResult.status !== 'fulfilled' ||
       commentsResult.status !== 'fulfilled' ||
       pensResult.status !== 'fulfilled' ||
-      newsResult.status !== 'fulfilled'
+      newsResult.status !== 'fulfilled' ||
+      siteResult.status !== 'fulfilled'
     ) {
       console.warn('Remote state partially unavailable. Falling back to cached or bundled data for failed slices.')
     }
+  }
+
+  if (USE_REMOTE_DB) {
+    state.site = resolveObjectState({ apiValue: apiSite, cachedKey: STORAGE_KEYS.cachedSite, fileValue: state.site })
   }
 
   if (USE_REMOTE_DB) {

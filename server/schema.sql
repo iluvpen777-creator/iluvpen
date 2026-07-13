@@ -46,6 +46,12 @@ create table if not exists pen_items (
 alter table pen_items
   add column if not exists price text;
 
+create table if not exists site_settings (
+  setting_key text primary key,
+  value_json jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists news_posts (
   slug text primary key,
   title text not null,
