@@ -1784,7 +1784,6 @@ const renderHome = () => {
         </div>
       </div>
     </section>
-    <p class="hero-caption">${escapeHtml('i_luv_pen Profile')}</p>
   </section>
 
   <section class="section reveal">
@@ -2521,7 +2520,7 @@ const renderLayout = () => {
   const showQuickLinks = state.currentRoute.page === 'home'
 
   app.innerHTML = localizeHtml(`
-    <div class="shell page-enter">
+    <div class="shell">
       ${renderHeader()}
       ${showQuickLinks ? renderQuickLinks() : ''}
       <main id="main-content">${pageHtml}</main>
