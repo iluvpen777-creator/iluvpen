@@ -33,10 +33,7 @@ body {
 body {
   font-family: 'Fraunces', 'Times New Roman', serif;
   color: var(--text);
-  background:
-    radial-gradient(1200px 600px at 10% -20%, rgba(107, 79, 58, 0.11), transparent 55%),
-    radial-gradient(900px 400px at 90% 0%, rgba(107, 79, 58, 0.09), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   line-height: 1.75;
   letter-spacing: 0.01em;
 }

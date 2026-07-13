@@ -1785,7 +1785,7 @@ const renderHome = () => {
         </div>
       </div>
     </section>
-    <p class="hero-caption">${escapeHtml(siteHeroImage ? 'Custom Home Hero' : newestCollectionPen?.name || 'Featured Pen')}</p>
+    <p class="hero-caption">${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</p>
   </section>
 
   <section class="section reveal">
