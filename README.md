@@ -43,6 +43,7 @@ docker compose up -d
 - 기본 DB: `iluvpen`
 - 기본 계정: `postgres`
 - 기본 비밀번호: `postgres`
+- 관리자 로그인: `.env`의 `ADMIN_PASSWORD`
 - 스키마 파일: `server/schema.sql` (컨테이너 최초 실행 시 자동 적용)
 
 ### 3) DB 연결 확인
@@ -82,6 +83,7 @@ GitHub Pages는 정적 호스팅이므로 DB 직접 실행이 불가능합니다
 	- `DATABASE_URL` 또는 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`
 	- `PGSSLMODE=require` (클라우드 DB인 경우 권장)
 	- `CORS_ORIGIN=https://<your-github-id>.github.io`
+	- `ADMIN_PASSWORD`, `ADMIN_TOKEN_SECRET`
 
 ### 2) DB 스키마 적용
 

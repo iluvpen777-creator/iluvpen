@@ -35,8 +35,13 @@ const STORAGE_KEYS = {
   users: 'iluvpen_users',
   community: 'iluvpen_community_posts',
   comments: 'iluvpen_comments',
+  cachedPens: 'iluvpen_cached_pens',
+  cachedNews: 'iluvpen_cached_news',
+  cachedCommunity: 'iluvpen_cached_community',
+  cachedComments: 'iluvpen_cached_comments',
   testCommentsSeeded: 'iluvpen_test_comments_seeded',
   admin: 'iluvpen_admin_auth',
+  adminToken: 'iluvpen_admin_token',
   resetVersion: 'iluvpen_reset_version',
   likeMarks: 'iluvpen_like_marks',
   notificationPromptSeen: 'iluvpen_notification_prompt_seen',
@@ -118,6 +123,11 @@ const localizeHtml = (html) => {
 const formatDate = (dateValue) => {
   const d = new Date(dateValue)
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+const formatPenPrice = (priceValue) => {
+  const price = String(priceValue || '').trim()
+  return price
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
@@ -353,6 +363,7 @@ const applyOneTimeDataReset = () => {
   localStorage.removeItem(STORAGE_KEYS.likeMarks)
   localStorage.removeItem(STORAGE_KEYS.testCommentsSeeded)
   localStorage.removeItem(STORAGE_KEYS.admin)
+  localStorage.removeItem(STORAGE_KEYS.adminToken)
   localStorage.setItem(STORAGE_KEYS.resetVersion, DATA_RESET_VERSION)
 }
 
@@ -471,10 +482,6 @@ const registerNickname = async (nickname, password, profileImage = '') => {
 }
 
 const loginNickname = async (nickname, password) => {
-  if (isProtectedAdminNickname(nickname) && password === 'iluvpen-admin') {
-    return { ok: true, nickname: 'i_luv_pen', profileImage: PROFILE_AVATAR_URL }
-  }
-
   if (USE_REMOTE_DB) {
     return apiRequest('/api/auth/login', {
       method: 'POST',
@@ -758,9 +765,10 @@ const syncImagePreviewForForm = async (form) => {
 
 const apiRequest = async (path, options = {}) => {
   const url = `${API_BASE_URL}${path}`
+  const { headers: extraHeaders = {}, ...restOptions } = options
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
+    ...restOptions,
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
   })
 
   if (!response.ok) {
@@ -840,6 +848,46 @@ const loadJson = async (path) => {
   return res.json()
 }
 
+const readCachedJson = (key, fallbackValue) => {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallbackValue
+    return JSON.parse(raw)
+  } catch {
+    return fallbackValue
+  }
+}
+
+const writeCachedJson = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
+const resolveArrayState = ({ apiValue, cachedKey, fileValue }) => {
+  if (Array.isArray(apiValue)) {
+    writeCachedJson(cachedKey, apiValue)
+    return apiValue
+  }
+
+  const cached = readCachedJson(cachedKey, null)
+  if (Array.isArray(cached)) return cached
+  return Array.isArray(fileValue) ? fileValue : []
+}
+
+const resolveObjectState = ({ apiValue, cachedKey, fileValue }) => {
+  if (apiValue && typeof apiValue === 'object' && !Array.isArray(apiValue)) {
+    writeCachedJson(cachedKey, apiValue)
+    return apiValue
+  }
+
+  const cached = readCachedJson(cachedKey, null)
+  if (cached && typeof cached === 'object' && !Array.isArray(cached)) return cached
+  return fileValue && typeof fileValue === 'object' && !Array.isArray(fileValue) ? fileValue : {}
+}
+
 const parseHashRoute = () => {
   const value = location.hash.replace(/^#\/?/, '')
   if (!value) return { page: 'home', param: '' }
@@ -875,9 +923,52 @@ const findCommentEntityById = (commentId) => {
   return null
 }
 
+const getAdminToken = () => localStorage.getItem(STORAGE_KEYS.adminToken) || ''
+
+const getAdminRequestHeaders = () => {
+  const token = getAdminToken().trim()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 const isAdmin = () => {
   const adminFlag = localStorage.getItem(STORAGE_KEYS.admin) === 'true'
-  return adminFlag && isCurrentProtectedAdmin()
+  return adminFlag && isCurrentProtectedAdmin() && Boolean(getAdminToken().trim())
+}
+
+const saveAdminCommentsSnapshot = () => {
+  if (!USE_REMOTE_DB || !isAdmin()) return Promise.resolve()
+  return apiRequest('/api/admin/comments-map', {
+    method: 'PUT',
+    headers: getAdminRequestHeaders(),
+    body: JSON.stringify({ comments: state.comments }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+  })
+}
+
+const adminDeleteCommentEntry = (commentId) => {
+  if (!USE_REMOTE_DB || !isAdmin()) return Promise.resolve()
+  return apiRequest(`/api/admin/comment/${encodeURIComponent(commentId)}`, {
+    method: 'DELETE',
+    headers: getAdminRequestHeaders(),
+  })
+}
+
+const adminUpdateCommunityPost = (id, payload) => {
+  if (!USE_REMOTE_DB || !isAdmin()) return Promise.resolve(null)
+  return apiRequest(`/api/admin/community/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: getAdminRequestHeaders(),
+    body: JSON.stringify(payload),
+  })
+}
+
+const adminDeleteCommunityPost = (id) => {
+  if (!USE_REMOTE_DB || !isAdmin()) return Promise.resolve(null)
+  return apiRequest(`/api/admin/community/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: getAdminRequestHeaders(),
+  })
 }
 
 const getPersistFailureMessage = (error, fallbackMessage) => {
@@ -891,15 +982,17 @@ const getPersistFailureMessage = (error, fallbackMessage) => {
 const saveComments = () => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
-    return
+    return Promise.resolve()
   }
   if (!USE_REMOTE_DB) {
     localStorage.setItem(STORAGE_KEYS.comments, JSON.stringify(state.comments))
-    return
+    return Promise.resolve()
   }
-  apiRequest('/api/state/comments-map', {
+  return apiRequest('/api/state/comments-map', {
     method: 'PUT',
     body: JSON.stringify({ comments: state.comments }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
   }).catch((error) => {
     console.error('Failed to save comments to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save comments to DB. Please check API/DB status.'))
@@ -909,16 +1002,18 @@ const saveComments = () => {
 const saveCommentLike = (commentId, likes) => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
-    return
+    return Promise.resolve()
   }
   if (!USE_REMOTE_DB) {
     localStorage.setItem(STORAGE_KEYS.comments, JSON.stringify(state.comments))
-    return
+    return Promise.resolve()
   }
 
-  apiRequest('/api/state/comment-like', {
+  return apiRequest('/api/state/comment-like', {
     method: 'PATCH',
     body: JSON.stringify({ commentId, likes }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
   }).catch((error) => {
     console.error('Failed to save comment like to DB:', error)
     alert('Failed to save like to DB. Please check API/DB status.')
@@ -1071,6 +1166,8 @@ const saveCommunity = () => {
   apiRequest('/api/state/community', {
     method: 'PUT',
     body: JSON.stringify({ community: state.community }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedCommunity, state.community)
   }).catch((error) => {
     console.error('Failed to save community to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save community to DB. Please check API/DB status.'))
@@ -1086,7 +1183,10 @@ const savePen = () => {
 
   apiRequest('/api/state/pen', {
     method: 'PUT',
+    headers: getAdminRequestHeaders(),
     body: JSON.stringify({ pen: state.pens }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedPens, state.pens)
   }).catch((error) => {
     console.error('Failed to save collection to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save collection to DB. Please check API/DB status.'))
@@ -1102,7 +1202,10 @@ const saveNews = () => {
 
   apiRequest('/api/state/news', {
     method: 'PUT',
+    headers: getAdminRequestHeaders(),
     body: JSON.stringify({ news: state.news }),
+  }).then(() => {
+    writeCachedJson(STORAGE_KEYS.cachedNews, state.news)
   }).catch((error) => {
     console.error('Failed to save news to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save news to DB. Please check API/DB status.'))
@@ -1675,6 +1778,7 @@ const renderHome = () => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            ${formatPenPrice(pen.price) ? `<p class="muted">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
           </div>
         </article>`
@@ -1712,11 +1816,11 @@ const renderHome = () => {
     <div class="section-head"><h2>Community Highlights</h2><a href="#/community">Community</a></div>
     <div class="list">${hotCommunity
       .map(
-        (post) => `<article class="list-item">
+        (post) => `<a class="list-item" href="#/community/${post.id}">
           <h3>${escapeHtml(post.title)}</h3>
           <p>${escapeHtml(post.content.slice(0, 130))}...</p>
           <p class="meta">${escapeHtml(post.nickname)} · Likes ${post.likes} · Comments ${getCommentThreadCount(`community:${post.id}`)}</p>
-        </article>`,
+        </a>`,
       )
       .join('')}</div>
   </section>
@@ -1729,7 +1833,7 @@ const renderCollection = (params) => {
 
   let filtered = [...state.pens].filter((pen) => {
     if (!search) return true
-    const target = [pen.name, pen.series, String(pen.year), ...(pen.keywords || [])].join(' ').toLowerCase()
+    const target = [pen.name, pen.series, String(pen.year), pen.price || '', ...(pen.keywords || [])].join(' ').toLowerCase()
     return target.includes(search)
   })
 
@@ -1748,7 +1852,7 @@ const renderCollection = (params) => {
     <form class="filter-bar" data-collection-filter>
       <label>
         Search
-        <input type="search" name="q" value="${escapeHtml(search)}" placeholder="Name, series, year, keyword" />
+        <input type="search" name="q" value="${escapeHtml(search)}" placeholder="Name, series, year, price, keyword" />
       </label>
       <label>
         Sort
@@ -1768,6 +1872,7 @@ const renderCollection = (params) => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            ${formatPenPrice(pen.price) ? `<p class="muted">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
@@ -1798,6 +1903,7 @@ const renderPenDetail = (id) => {
         <article class="detail-panel">
           <h2>${escapeHtml(pen.name)}</h2>
           <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
           <p class="muted">${escapeHtml(pen.description || '')}</p>
           ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
@@ -2002,7 +2108,7 @@ const renderSearch = () => {
     <h2>Search Archive</h2>
     <label>
       Live search
-      <input type="search" data-global-search placeholder="Name, series, year, keyword" />
+      <input type="search" data-global-search placeholder="Collection, news, community keyword" />
     </label>
     <div id="search-results" class="list"></div>
   </section>
@@ -2054,6 +2160,7 @@ const renderAdmin = () => {
           <label>Name<input name="name" required /></label>
           <label>Series<input name="series" required /></label>
           <label>Release year<input name="year" type="number" required /></label>
+          <label>Price<input name="price" placeholder="KRW 1,250,000" /></label>
           <label>Description<textarea name="description" rows="2" required></textarea></label>
           <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
           <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
@@ -2407,6 +2514,7 @@ const renderLayout = () => {
 
 const bindCarousel = () => {
   const indexes = new Map()
+  const pendingTransitions = new WeakMap()
   const animateImageSwap = (img, direction, applySwap) => {
     if (!img || typeof img.animate !== 'function') {
       applySwap()
@@ -2414,12 +2522,20 @@ const bindCarousel = () => {
     }
 
     if (img.dataset.animating === 'true') {
-      applySwap()
+      pendingTransitions.set(img, { direction, applySwap })
       return
     }
 
     img.dataset.animating = 'true'
     const offset = direction >= 0 ? 34 : -34
+
+    const finish = () => {
+      img.dataset.animating = 'false'
+      const pending = pendingTransitions.get(img)
+      if (!pending) return
+      pendingTransitions.delete(img)
+      animateImageSwap(img, pending.direction, pending.applySwap)
+    }
 
     const fadeOut = img.animate(
       [
@@ -2438,10 +2554,10 @@ const bindCarousel = () => {
         ],
         { duration: 280, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
       )
-      fadeIn.onfinish = () => {
-        img.dataset.animating = 'false'
-      }
+      fadeIn.onfinish = finish
+      fadeIn.oncancel = finish
     }
+    fadeOut.oncancel = finish
   }
 
   const getCarouselImages = (id) => {
@@ -2475,7 +2591,7 @@ const bindCarousel = () => {
     })
   }
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const prev = event.target.closest('[data-carousel-prev]')
     const next = event.target.closest('[data-carousel-next]')
     const dot = event.target.closest('[data-carousel-dot]')
@@ -2542,7 +2658,7 @@ const bindCarousel = () => {
 }
 
 const bindInteractions = () => {
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const openPen = event.target.closest('[data-open-pen]')
     const openNews = event.target.closest('[data-open-news]')
     const createPost = event.target.closest('[data-create-community]')
@@ -2639,6 +2755,7 @@ const bindInteractions = () => {
     if (userLogout) {
       localStorage.removeItem(STORAGE_KEYS.nickname)
       localStorage.removeItem(STORAGE_KEYS.admin)
+      localStorage.removeItem(STORAGE_KEYS.adminToken)
       state.accountMenuOpen = false
       state.accountManageMode = ''
       state.userProfileImage = ''
@@ -2716,11 +2833,23 @@ const bindInteractions = () => {
       post.likes = Math.max(0, Number(post.likes || 0) + (nowLiked ? 1 : -1))
       saveCommunity()
       render()
+      return
     }
 
     if (deleteCommunity) {
       const post = state.community.find((item) => item.id === deleteCommunity.dataset.deleteCommunity)
       if (!post || !canManageOwnedContent(post.nickname)) return
+      if (USE_REMOTE_DB && isAdmin()) {
+        try {
+          await adminDeleteCommunityPost(post.id)
+          state.community = state.community.filter((item) => item.id !== post.id)
+          writeCachedJson(STORAGE_KEYS.cachedCommunity, state.community)
+          render()
+        } catch (error) {
+          alert(error.message || 'Failed to delete community post.')
+        }
+        return
+      }
       state.community = state.community.filter((item) => item.id !== post.id)
       saveCommunity()
       render()
@@ -2733,6 +2862,18 @@ const bindInteractions = () => {
       if (!nextTitle) return
       const next = prompt('Edit content', post.content)
       if (!next) return
+      if (USE_REMOTE_DB && isAdmin()) {
+        try {
+          await adminUpdateCommunityPost(post.id, { title: nextTitle, content: next })
+          post.title = nextTitle
+          post.content = next
+          writeCachedJson(STORAGE_KEYS.cachedCommunity, state.community)
+          render()
+        } catch (error) {
+          alert(error.message || 'Failed to update community post.')
+        }
+        return
+      }
       post.title = nextTitle
       post.content = next
       saveCommunity()
@@ -2747,7 +2888,7 @@ const bindInteractions = () => {
       const nowLiked = toggleLikeMark('comments', target.entity.id)
       target.entity.likes = Math.max(0, Number(target.entity.likes || 0) + (nowLiked ? 1 : -1))
       syncCommentLikeUi(likeComment, nowLiked, target.entity.likes)
-      saveCommentLike(target.entity.id, target.entity.likes)
+      await saveCommentLike(target.entity.id, target.entity.likes)
     }
 
     if (deleteComment) {
@@ -2756,8 +2897,19 @@ const bindInteractions = () => {
       const list = state.comments[targetId] || []
       const target = list.find((item) => item.id === commentId)
       if (!target || !canManageOwnedContent(target.nickname)) return
+      if (USE_REMOTE_DB && isAdmin()) {
+        try {
+          await adminDeleteCommentEntry(commentId)
+          state.comments[targetId] = list.filter((item) => item.id !== commentId)
+          writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+          render()
+        } catch (error) {
+          alert(error.message || 'Failed to delete comment.')
+        }
+        return
+      }
       state.comments[targetId] = list.filter((item) => item.id !== commentId)
-      saveComments()
+      await saveComments()
       render()
     }
 
@@ -2770,8 +2922,19 @@ const bindInteractions = () => {
       if (!parent || !Array.isArray(parent.replies)) return
       const targetReply = parent.replies.find((item) => item.id === replyId)
       if (!targetReply || !canManageOwnedContent(targetReply.nickname)) return
+      if (USE_REMOTE_DB && isAdmin()) {
+        try {
+          await adminDeleteCommentEntry(replyId)
+          parent.replies = parent.replies.filter((item) => item.id !== replyId)
+          writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+          render()
+        } catch (error) {
+          alert(error.message || 'Failed to delete reply.')
+        }
+        return
+      }
       parent.replies = parent.replies.filter((item) => item.id !== replyId)
-      saveComments()
+      await saveComments()
       render()
     }
 
@@ -2827,6 +2990,7 @@ const bindInteractions = () => {
 
     if (adminLogout) {
       localStorage.removeItem(STORAGE_KEYS.admin)
+      localStorage.removeItem(STORAGE_KEYS.adminToken)
       render()
     }
 
@@ -3011,10 +3175,18 @@ const bindInteractions = () => {
       const id = toggleCommunityPin.dataset.adminTogglePinCommunity
       const post = state.community.find((c) => c.id === id)
       if (!post) return
-      post.pinned = !post.pinned
-      saveCommunity()
-      alert('Community pin state updated.')
-      render()
+      try {
+        if (USE_REMOTE_DB) {
+          await adminUpdateCommunityPost(post.id, { pinned: !post.pinned })
+        }
+        post.pinned = !post.pinned
+        writeCachedJson(STORAGE_KEYS.cachedCommunity, state.community)
+        if (!USE_REMOTE_DB) saveCommunity()
+        alert('Community pin state updated.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to update community pin state.')
+      }
     }
 
     if (deleteCommentByAdmin) {
@@ -3022,10 +3194,18 @@ const bindInteractions = () => {
       const targetId = form?.targetId?.value?.trim()
       const id = form?.id?.value?.trim()
       if (!targetId || !id) return
-      state.comments[targetId] = (state.comments[targetId] || []).filter((c) => c.id !== id)
-      saveComments()
-      alert('Comment deleted from DB.')
-      render()
+      try {
+        if (USE_REMOTE_DB) {
+          await adminDeleteCommentEntry(id)
+        }
+        state.comments[targetId] = (state.comments[targetId] || []).filter((c) => c.id !== id)
+        writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+        if (!USE_REMOTE_DB) saveComments()
+        alert('Comment deleted from DB.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to delete comment from DB.')
+      }
     }
   })
 
@@ -3060,7 +3240,7 @@ const bindInteractions = () => {
             likes: 0,
             createdAt: new Date().toISOString(),
           })
-          saveComments()
+          await saveComments()
           render()
           return
         }
@@ -3089,6 +3269,7 @@ const bindInteractions = () => {
         const result = await registerNickname(nickname, password, profileImage)
         localStorage.setItem(STORAGE_KEYS.nickname, result.nickname || nickname)
         localStorage.removeItem(STORAGE_KEYS.admin)
+        localStorage.removeItem(STORAGE_KEYS.adminToken)
         state.userProfileImage = result.profileImage || ''
         state.authModalOpen = false
         state.authMode = 'login'
@@ -3113,12 +3294,14 @@ const bindInteractions = () => {
       try {
         const result = await loginNickname(nickname, password)
         localStorage.setItem(STORAGE_KEYS.nickname, result.nickname || nickname)
-        if (isProtectedAdminNickname(result.nickname || nickname)) {
+        if (result.isAdmin) {
           localStorage.setItem(STORAGE_KEYS.admin, 'true')
+          localStorage.setItem(STORAGE_KEYS.adminToken, result.adminToken || '')
         } else {
           localStorage.removeItem(STORAGE_KEYS.admin)
+          localStorage.removeItem(STORAGE_KEYS.adminToken)
         }
-        state.userProfileImage = result.profileImage || ''
+        state.userProfileImage = result.profileImage || (result.isAdmin ? PROFILE_AVATAR_URL : '')
         state.authModalOpen = false
         state.authMode = 'login'
         await initNotificationConsent({ justLoggedIn: true })
@@ -3229,6 +3412,7 @@ const bindInteractions = () => {
         name: pensForm.name.value.trim(),
         series: pensForm.series.value.trim(),
         year: Number(pensForm.year.value),
+        price: pensForm.price.value.trim(),
         createdAt: new Date().toISOString(),
         description: pensForm.description.value.trim(),
         descriptionLong: pensForm.descriptionLong.value.trim(),
@@ -3279,9 +3463,17 @@ const bindInteractions = () => {
       }
       state.comments[targetId] ||= []
       upsertBy(state.comments[targetId], 'id', payload)
-      saveComments()
-      alert('Comment saved to DB.')
-      render()
+      try {
+        if (USE_REMOTE_DB) {
+          await saveAdminCommentsSnapshot()
+        } else {
+          saveComments()
+        }
+        alert('Comment saved to DB.')
+        render()
+      } catch (error) {
+        alert(error.message || 'Failed to save comment to DB.')
+      }
       return
     }
 
@@ -3330,7 +3522,7 @@ const bindInteractions = () => {
         createdAt: new Date().toISOString(),
         replies: [],
       })
-      saveComments()
+      await saveComments()
       render()
       return
     }
@@ -3339,13 +3531,19 @@ const bindInteractions = () => {
       event.preventDefault()
       const nickname = adminLogin.nickname.value.trim()
       const value = adminLogin.password.value
-      if (nickname === 'i_luv_pen' && value === 'iluvpen-admin') {
-        localStorage.setItem(STORAGE_KEYS.nickname, 'i_luv_pen')
+      try {
+        const result = await loginNickname(nickname, value)
+        if (!result.isAdmin) {
+          throw new Error('Admin account is required.')
+        }
+
+        localStorage.setItem(STORAGE_KEYS.nickname, result.nickname || ADMIN_NICKNAME)
         localStorage.setItem(STORAGE_KEYS.admin, 'true')
-        state.userProfileImage = PROFILE_AVATAR_URL
+        localStorage.setItem(STORAGE_KEYS.adminToken, result.adminToken || '')
+        state.userProfileImage = result.profileImage || PROFILE_AVATAR_URL
         render()
-      } else {
-        alert('Incorrect admin nickname or password.')
+      } catch (error) {
+        alert(error.message || 'Incorrect admin nickname or password.')
       }
     }
 
@@ -3431,14 +3629,45 @@ const bindInteractions = () => {
     const global = event.target.closest('[data-global-search]')
     if (!global) return
     const q = global.value.toLowerCase()
-    const result = state.pens.filter((pen) => {
-      const target = [pen.name, pen.series, pen.year, ...(pen.keywords || [])].join(' ').toLowerCase()
-      return target.includes(q)
-    })
+    const results = []
+
+    for (const pen of state.pens) {
+      const target = [pen.name, pen.series, pen.year, pen.price || '', pen.description, ...(pen.keywords || [])].join(' ').toLowerCase()
+      if (!target.includes(q)) continue
+      results.push({
+        type: 'Collection',
+        href: `#/pen/${pen.id}`,
+        title: pen.name,
+        meta: `${pen.series} · ${pen.year}${formatPenPrice(pen.price) ? ` · ${formatPenPrice(pen.price)}` : ''}`,
+      })
+    }
+
+    for (const post of state.news) {
+      const target = [post.title, post.subtitle, post.category, post.content, ...(post.tags || [])].join(' ').toLowerCase()
+      if (!target.includes(q)) continue
+      results.push({
+        type: 'News',
+        href: `#/news/${post.slug}`,
+        title: post.title,
+        meta: `${post.category || 'Article'} · ${formatDate(post.publishedAt)}`,
+      })
+    }
+
+    for (const post of state.community) {
+      const target = [post.title, post.content, post.nickname].join(' ').toLowerCase()
+      if (!target.includes(q)) continue
+      results.push({
+        type: 'Community',
+        href: `#/community/${post.id}`,
+        title: post.title,
+        meta: `${post.nickname} · Likes ${Number(post.likes || 0)}`,
+      })
+    }
+
     const container = document.querySelector('#search-results')
-    container.innerHTML = result
+    container.innerHTML = results
       .map(
-        (pen) => `<article class="list-item" data-open-pen="${pen.id}"><h3>${escapeHtml(pen.name)}</h3><p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p></article>`,
+        (item) => `<a class="list-item" href="${escapeHtml(item.href)}"><p class="eyebrow">${escapeHtml(item.type)}</p><h3>${escapeHtml(item.title)}</h3><p class="meta">${escapeHtml(item.meta)}</p></a>`,
       )
       .join('')
   })
@@ -3574,6 +3803,7 @@ const bindAdminEntityPickers = () => {
       penForm.name.value = selected.name
       penForm.series.value = selected.series
       penForm.year.value = selected.year
+      penForm.price.value = selected.price || ''
       penForm.description.value = selected.description || ''
       penForm.descriptionLong.value = selected.descriptionLong || ''
       penForm.images.value = (selected.images || []).join('\n')
@@ -3615,6 +3845,7 @@ export const bootstrapApp = async (rootEl) => {
     localStorage.removeItem(STORAGE_KEYS.community)
     localStorage.removeItem(STORAGE_KEYS.comments)
     localStorage.removeItem(STORAGE_KEYS.admin)
+    localStorage.removeItem(STORAGE_KEYS.adminToken)
     localStorage.removeItem(STORAGE_KEYS.likeMarks)
   }
   applyOneTimeDataReset()
@@ -3651,28 +3882,45 @@ export const bootstrapApp = async (rootEl) => {
   let apiPens = null
   let apiNews = null
   if (USE_REMOTE_DB) {
-    try {
-      ;[apiCommunity, apiComments, apiPens, apiNews] = await Promise.all([
-        apiRequest('/api/state/community'),
-        apiRequest('/api/state/comments-map'),
-        apiRequest('/api/state/pen'),
-        apiRequest('/api/state/news'),
-      ])
-    } catch (error) {
-      console.error('Failed to load remote DB state.', error)
+    const [communityResult, commentsResult, pensResult, newsResult] = await Promise.allSettled([
+      apiRequest('/api/state/community'),
+      apiRequest('/api/state/comments-map'),
+      apiRequest('/api/state/pen'),
+      apiRequest('/api/state/news'),
+    ])
+
+    if (communityResult.status === 'fulfilled') apiCommunity = communityResult.value
+    else console.error('Failed to load remote community state.', communityResult.reason)
+
+    if (commentsResult.status === 'fulfilled') apiComments = commentsResult.value
+    else console.error('Failed to load remote comments state.', commentsResult.reason)
+
+    if (pensResult.status === 'fulfilled') apiPens = pensResult.value
+    else console.error('Failed to load remote collection state.', pensResult.reason)
+
+    if (newsResult.status === 'fulfilled') apiNews = newsResult.value
+    else console.error('Failed to load remote news state.', newsResult.reason)
+
+    if (
+      communityResult.status !== 'fulfilled' ||
+      commentsResult.status !== 'fulfilled' ||
+      pensResult.status !== 'fulfilled' ||
+      newsResult.status !== 'fulfilled'
+    ) {
+      console.warn('Remote state partially unavailable. Falling back to cached or bundled data for failed slices.')
     }
   }
 
   if (USE_REMOTE_DB) {
-    state.pens = Array.isArray(apiPens) ? apiPens : []
-    state.news = Array.isArray(apiNews) ? apiNews : []
+    state.pens = resolveArrayState({ apiValue: apiPens, cachedKey: STORAGE_KEYS.cachedPens, fileValue: pensFromFile })
+    state.news = resolveArrayState({ apiValue: apiNews, cachedKey: STORAGE_KEYS.cachedNews, fileValue: newsFromFile })
   } else {
     state.pens = Array.isArray(pensFromFile) ? pensFromFile : []
     state.news = Array.isArray(newsFromFile) ? newsFromFile : []
   }
 
   if (USE_REMOTE_DB) {
-    state.community = Array.isArray(apiCommunity) ? apiCommunity : []
+    state.community = resolveArrayState({ apiValue: apiCommunity, cachedKey: STORAGE_KEYS.cachedCommunity, fileValue: community })
   } else if (isBlockedLocalMode()) {
     state.community = Array.isArray(community) ? community : []
   } else {
@@ -3680,7 +3928,7 @@ export const bootstrapApp = async (rootEl) => {
     state.community = cachedCommunity ? JSON.parse(cachedCommunity) : community
   }
   if (USE_REMOTE_DB) {
-    state.comments = apiComments && typeof apiComments === 'object' && !Array.isArray(apiComments) ? apiComments : {}
+    state.comments = resolveObjectState({ apiValue: apiComments, cachedKey: STORAGE_KEYS.cachedComments, fileValue: commentsFromFile })
   } else if (isBlockedLocalMode()) {
     state.comments = commentsFromFile && typeof commentsFromFile === 'object' && !Array.isArray(commentsFromFile) ? commentsFromFile : {}
   } else {

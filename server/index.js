@@ -1,5 +1,6 @@
 import cors from 'cors'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import dotenv from 'dotenv'
 import express from 'express'
 import { pool, testDbConnection } from './db.js'
@@ -27,6 +28,29 @@ const safeIso = (value) => {
 const mentionRegex = /(^|\s)@([a-zA-Z0-9_\-.]+)/g
 
 const ADMIN_NICKNAME = 'i_luv_pen'
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || 'iluvpen-admin')
+const ADMIN_TOKEN_SECRET = String(process.env.ADMIN_TOKEN_SECRET || ADMIN_PASSWORD)
+
+const buildAdminToken = () => crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(ADMIN_NICKNAME).digest('hex')
+
+const isAdminTokenValid = (token = '') => {
+  const normalized = String(token || '').trim()
+  if (!normalized) return false
+
+  const expected = Buffer.from(buildAdminToken())
+  const received = Buffer.from(normalized)
+  if (expected.length !== received.length) return false
+  return crypto.timingSafeEqual(expected, received)
+}
+
+const requireAdminAuth = (req, res, next) => {
+  const authHeader = String(req.headers.authorization || '')
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!isAdminTokenValid(token)) {
+    return res.status(401).json({ ok: false, message: 'Admin authentication required.' })
+  }
+  next()
+}
 
 const extractMentions = (content = '') => {
   const mentions = []
@@ -44,6 +68,73 @@ const findUserByNickname = async (nickname) => {
      limit 1`,
     [nickname],
   )
+}
+
+const replaceCommentsMap = async (payload) => {
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query('delete from comment_mentions')
+    await client.query('delete from comments')
+
+    for (const [targetId, comments] of Object.entries(payload)) {
+      for (const comment of comments || []) {
+        await client.query(
+          `insert into comments (id, target_id, nickname, content, image, likes, parent_id, created_at)
+           values ($1, $2, $3, $4, $5, $6, null, $7::timestamptz)`,
+          [
+            comment.id,
+            targetId,
+            comment.nickname,
+            comment.content,
+            comment.image || '',
+            Number(comment.likes || 0),
+            safeIso(comment.createdAt),
+          ],
+        )
+
+        for (const nickname of extractMentions(comment.content || '')) {
+          await client.query(
+            `insert into comment_mentions (comment_id, mentioned_nickname)
+             values ($1, $2)`,
+            [comment.id, nickname],
+          )
+        }
+
+        for (const reply of comment.replies || []) {
+          await client.query(
+            `insert into comments (id, target_id, nickname, content, image, likes, parent_id, created_at)
+             values ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)`,
+            [
+              reply.id,
+              targetId,
+              reply.nickname,
+              reply.content,
+              reply.image || '',
+              Number(reply.likes || 0),
+              comment.id,
+              safeIso(reply.createdAt),
+            ],
+          )
+
+          for (const nickname of extractMentions(reply.content || '')) {
+            await client.query(
+              `insert into comment_mentions (comment_id, mentioned_nickname)
+               values ($1, $2)`,
+              [reply.id, nickname],
+            )
+          }
+        }
+      }
+    }
+
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 const verifyUserPassword = async (nickname, password) => {
@@ -72,6 +163,7 @@ const normalizePen = (row) => ({
   name: row.name,
   series: row.series,
   year: Number(row.year || 0),
+  price: row.price || '',
   description: row.description || '',
   descriptionLong: row.description_long || '',
   keywords: Array.isArray(row.keywords) ? row.keywords : [],
@@ -209,12 +301,26 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
+    if (nickname.toLowerCase() === ADMIN_NICKNAME.toLowerCase()) {
+      if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ ok: false, message: 'Invalid nickname or password.' })
+      }
+
+      return res.json({
+        ok: true,
+        nickname: ADMIN_NICKNAME,
+        profileImage: '',
+        isAdmin: true,
+        adminToken: buildAdminToken(),
+      })
+    }
+
     const user = await verifyUserPassword(nickname, password)
     if (!user) {
       return res.status(401).json({ ok: false, message: 'Invalid nickname or password.' })
     }
 
-    return res.json({ ok: true, nickname: user.nickname, profileImage: user.profile_image || '' })
+    return res.json({ ok: true, nickname: user.nickname, profileImage: user.profile_image || '', isAdmin: false })
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message })
   }
@@ -380,10 +486,72 @@ app.put('/api/state/community', async (req, res) => {
   }
 })
 
+app.patch('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  if (!id) {
+    return res.status(400).json({ ok: false, message: 'Community post ID is required.' })
+  }
+
+  const updates = []
+  const values = [id]
+
+  if (typeof req.body?.title === 'string') {
+    values.push(String(req.body.title).trim())
+    updates.push(`title = $${values.length}`)
+  }
+  if (typeof req.body?.content === 'string') {
+    values.push(String(req.body.content).trim())
+    updates.push(`content = $${values.length}`)
+  }
+  if (typeof req.body?.pinned === 'boolean') {
+    values.push(Boolean(req.body.pinned))
+    updates.push(`pinned = $${values.length}`)
+  }
+
+  if (!updates.length) {
+    return res.status(400).json({ ok: false, message: 'No community post fields to update.' })
+  }
+
+  try {
+    const result = await pool.query(
+      `update community_posts
+       set ${updates.join(', ')}
+       where id = $1
+       returning id, pinned, title, content`,
+      values,
+    )
+
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Community post not found.' })
+    }
+
+    return res.json({ ok: true, post: result.rows[0] })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.delete('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  if (!id) {
+    return res.status(400).json({ ok: false, message: 'Community post ID is required.' })
+  }
+
+  try {
+    const result = await pool.query('delete from community_posts where id = $1', [id])
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Community post not found.' })
+    }
+    return res.json({ ok: true, id })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
 app.get('/api/state/pen', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `select id, name, series, year, description, description_long, keywords, images, created_at
+      `select id, name, series, year, price, description, description_long, keywords, images, created_at
        from pen_items
        order by created_at desc`,
     )
@@ -393,7 +561,7 @@ app.get('/api/state/pen', async (_req, res) => {
   }
 })
 
-app.put('/api/state/pen', async (req, res) => {
+app.put('/api/state/pen', requireAdminAuth, async (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : req.body?.pen
   if (!Array.isArray(payload)) {
     return res.status(400).json({ ok: false, message: 'Invalid pen payload' })
@@ -406,13 +574,14 @@ app.put('/api/state/pen', async (req, res) => {
 
     for (const item of payload) {
       await client.query(
-        `insert into pen_items (id, name, series, year, description, description_long, keywords, images, created_at)
-         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::timestamptz)`,
+        `insert into pen_items (id, name, series, year, price, description, description_long, keywords, images, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::timestamptz)`,
         [
           item.id,
           item.name,
           item.series,
           Number(item.year || 0),
+          String(item.price || '').trim(),
           item.description || '',
           item.descriptionLong || '',
           JSON.stringify(Array.isArray(item.keywords) ? item.keywords : []),
@@ -445,7 +614,7 @@ app.get('/api/state/news', async (_req, res) => {
   }
 })
 
-app.put('/api/state/news', async (req, res) => {
+app.put('/api/state/news', requireAdminAuth, async (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : req.body?.news
   if (!Array.isArray(payload)) {
     return res.status(400).json({ ok: false, message: 'Invalid news payload' })
@@ -525,70 +694,42 @@ app.put('/api/state/comments-map', async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
   }
 
-  const client = await pool.connect()
   try {
-    await client.query('begin')
-    await client.query('delete from comment_mentions')
-    await client.query('delete from comments')
-
-    for (const [targetId, comments] of Object.entries(payload)) {
-      for (const comment of comments || []) {
-        await client.query(
-          `insert into comments (id, target_id, nickname, content, image, likes, parent_id, created_at)
-           values ($1, $2, $3, $4, $5, $6, null, $7::timestamptz)`,
-          [
-            comment.id,
-            targetId,
-            comment.nickname,
-            comment.content,
-            comment.image || '',
-            Number(comment.likes || 0),
-            safeIso(comment.createdAt),
-          ],
-        )
-
-        for (const nickname of extractMentions(comment.content || '')) {
-          await client.query(
-            `insert into comment_mentions (comment_id, mentioned_nickname)
-             values ($1, $2)`,
-            [comment.id, nickname],
-          )
-        }
-
-        for (const reply of comment.replies || []) {
-          await client.query(
-            `insert into comments (id, target_id, nickname, content, image, likes, parent_id, created_at)
-             values ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)`,
-            [
-              reply.id,
-              targetId,
-              reply.nickname,
-              reply.content,
-              reply.image || '',
-              Number(reply.likes || 0),
-              comment.id,
-              safeIso(reply.createdAt),
-            ],
-          )
-
-          for (const nickname of extractMentions(reply.content || '')) {
-            await client.query(
-              `insert into comment_mentions (comment_id, mentioned_nickname)
-               values ($1, $2)`,
-              [reply.id, nickname],
-            )
-          }
-        }
-      }
-    }
-
-    await client.query('commit')
+    await replaceCommentsMap(payload)
     res.json({ ok: true })
   } catch (error) {
-    await client.query('rollback')
     res.status(500).json({ ok: false, message: error.message })
-  } finally {
-    client.release()
+  }
+})
+
+app.put('/api/admin/comments-map', requireAdminAuth, async (req, res) => {
+  const payload = req.body?.comments || req.body
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
+  }
+
+  try {
+    await replaceCommentsMap(payload)
+    res.json({ ok: true })
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.delete('/api/admin/comment/:id', requireAdminAuth, async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  if (!id) {
+    return res.status(400).json({ ok: false, message: 'Comment ID is required.' })
+  }
+
+  try {
+    const result = await pool.query('delete from comments where id = $1', [id])
+    if (!result.rowCount) {
+      return res.status(404).json({ ok: false, message: 'Comment not found.' })
+    }
+    res.json({ ok: true, id })
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message })
   }
 })
 
