@@ -1758,8 +1758,7 @@ const sortByYearThenCreatedAtDesc = (a, b) => b.year - a.year || new Date(b.crea
 const renderHome = () => {
   const latestPens = [...state.pens].sort(sortByYearThenCreatedAtDesc).slice(0, 4)
   const newestCollectionPen = [...state.pens].sort(sortByYearThenCreatedAtDesc)[0]
-  const siteHeroImage = getFirstImageValue(state.site?.homeHeroImage || '')
-  const heroImage = siteHeroImage || newestCollectionPen?.images?.[0] || ''
+  const heroImage = PROFILE_AVATAR_URL
   const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
 
@@ -1774,7 +1773,7 @@ const renderHome = () => {
 
   return `
   <section class="hero-shell reveal">
-    <section class="hero hero-feature" ${heroImage ? `style="--hero-image: url('${escapeHtml(heroImage)}')"` : ''}>
+    <section class="hero hero-feature home-profile-hero" ${heroImage ? `style="--hero-image: url('${escapeHtml(heroImage)}')"` : ''}>
       <div class="hero-content">
         <p class="eyebrow">Premium Archive</p>
         <h1>i_luv_pen</h1>
@@ -1785,7 +1784,7 @@ const renderHome = () => {
         </div>
       </div>
     </section>
-    <p class="hero-caption">${escapeHtml(newestCollectionPen?.name || 'Featured Pen')}</p>
+    <p class="hero-caption">${escapeHtml('i_luv_pen Profile')}</p>
   </section>
 
   <section class="section reveal">
@@ -2198,29 +2197,6 @@ const renderAdmin = () => {
           <div class="editor-actions">
             <button type="submit" class="btn">Add/Update + Save</button>
             <button type="button" class="btn ghost" data-admin-delete-pen>Delete + Save</button>
-          </div>
-          </form>
-        </div>
-      </details></article>
-
-      <article class="card"><details class="admin-panel-fold">
-        <summary class="admin-panel-toggle">Home Hero Image</summary>
-        <div class="card-body">
-          <form class="admin-editor" data-admin-site>
-          <label>Home hero image URL (optional)
-            <textarea name="homeHeroImage" rows="4" placeholder="https://... (first line used)">${escapeHtml(state.site?.homeHeroImage || '')}</textarea>
-          </label>
-          <label>
-            Home hero image file (optional)
-            <input name="imageFile" type="file" accept="image/*" hidden />
-            <div class="editor-actions file-picker">
-              <button type="button" class="btn ghost" data-pick-file>Choose file</button>
-              <span class="muted" data-file-name>No file chosen</span>
-            </div>
-          </label>
-          <p class="muted">If empty, the latest collection photo is used automatically.</p>
-          <div class="editor-actions">
-            <button type="submit" class="btn">Save Home Hero</button>
           </div>
           </form>
         </div>

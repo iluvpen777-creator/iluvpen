@@ -225,6 +225,30 @@ main {
   align-content: space-between;
 }
 
+.hero.hero-feature.home-profile-hero {
+  background-image: none;
+}
+
+.hero.hero-feature.home-profile-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--hero-image);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  transform-origin: center center;
+}
+
+@media (min-width: 821px) {
+  .hero.hero-feature.home-profile-hero::after {
+    background-size: contain;
+    transform: rotate(-90deg) scale(1.02);
+  }
+}
+
 .hero.hero-feature::before {
   content: none;
 }
