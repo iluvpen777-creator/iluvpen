@@ -593,10 +593,12 @@ main {
 }
 
 .list-item {
+  display: block;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 14px;
   background: var(--card);
+  text-decoration: none;
 }
 
 .card,
