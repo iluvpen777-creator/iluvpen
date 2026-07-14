@@ -150,7 +150,7 @@ const normalizePenPriceForStorage = (priceValue) => {
 const formatPenPrice = (priceValue) => {
   const amount = parsePenPriceNumber(priceValue)
   if (amount === null) return ''
-  return `EUR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`
+  return `€ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
