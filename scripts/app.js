@@ -126,9 +126,31 @@ const formatDate = (dateValue) => {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
+const parsePenPriceNumber = (priceValue) => {
+  const raw = String(priceValue || '').trim()
+  if (!raw) return null
+  const digitsOnly = raw.replace(/\D/g, '')
+  if (!digitsOnly) return null
+  const amount = Number(digitsOnly)
+  return Number.isFinite(amount) ? amount : null
+}
+
+const formatPenPriceInput = (priceValue) => {
+  const amount = parsePenPriceNumber(priceValue)
+  if (amount === null) return ''
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)
+}
+
+const normalizePenPriceForStorage = (priceValue) => {
+  const amount = parsePenPriceNumber(priceValue)
+  if (amount === null) return ''
+  return String(Math.trunc(amount))
+}
+
 const formatPenPrice = (priceValue) => {
-  const price = String(priceValue || '').trim()
-  return price
+  const amount = parsePenPriceNumber(priceValue)
+  if (amount === null) return ''
+  return `USD ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
@@ -1798,7 +1820,7 @@ const renderHome = () => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
           </div>
         </article>`
@@ -1892,11 +1914,11 @@ const renderCollection = (params) => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
-                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
                 : ''
             }
           </div>
@@ -1923,13 +1945,13 @@ const renderPenDetail = (id) => {
         <article class="detail-panel">
           <h2>${escapeHtml(pen.name)}</h2>
           <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
           <p class="muted">${escapeHtml(pen.description || '')}</p>
           ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
           ${
             isAdmin()
-              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
           <ul class="admin-photo-list">${pen.images
             .map(
               (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:up">Move up</button><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:down">Move down</button><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></div></li>`,
@@ -2180,7 +2202,7 @@ const renderAdmin = () => {
           <label>Name<input name="name" required /></label>
           <label>Series<input name="series" required /></label>
           <label>Release year<input name="year" type="number" required /></label>
-          <label>Price<input name="price" placeholder="KRW 1,250,000" /></label>
+          <label>Price (USD)<input name="price" inputmode="numeric" placeholder="1,250,000" /></label>
           <label>Description<textarea name="description" rows="2" required></textarea></label>
           <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
           <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
@@ -2701,6 +2723,7 @@ const bindInteractions = () => {
     const deleteNewsInline = event.target.closest('[data-admin-delete-news-inline]')
     const editPenTitleInline = event.target.closest('[data-admin-edit-pen-title-inline]')
     const editPenTextInline = event.target.closest('[data-admin-edit-pen-text-inline]')
+    const editPenPriceInline = event.target.closest('[data-admin-edit-pen-price-inline]')
     const editNewsTitleInline = event.target.closest('[data-admin-edit-news-title-inline]')
     const editNewsTextInline = event.target.closest('[data-admin-edit-news-text-inline]')
     const editNewsCoverInline = event.target.closest('[data-admin-edit-news-cover-inline]')
@@ -2749,7 +2772,7 @@ const bindInteractions = () => {
     }
 
     const clickedAdminControl = event.target.closest(
-      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-edit-pen-price-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
     const clickedLinkOrButton = event.target.closest('a, button, input, textarea, select, label')
@@ -3089,6 +3112,27 @@ const bindInteractions = () => {
         pen.descriptionLong = (values.descriptionLong || '').trim()
         savePen()
         alert('Pen text updated.')
+        render()
+      })
+      return
+    }
+
+    if (editPenPriceInline) {
+      if (!isAdmin()) return
+      const id = editPenPriceInline.dataset.adminEditPenPriceInline
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminFields('Edit pen price', [
+        {
+          name: 'price',
+          label: 'Price (USD)',
+          value: formatPenPriceInput(pen.price),
+        },
+      ]).then((values) => {
+        if (!values) return
+        pen.price = normalizePenPriceForStorage(values.price)
+        savePen()
+        alert('Pen price updated.')
         render()
       })
       return
@@ -3446,7 +3490,7 @@ const bindInteractions = () => {
         name: pensForm.name.value.trim(),
         series: pensForm.series.value.trim(),
         year: Number(pensForm.year.value),
-        price: pensForm.price.value.trim(),
+        price: normalizePenPriceForStorage(pensForm.price.value),
         createdAt: new Date().toISOString(),
         description: pensForm.description.value.trim(),
         descriptionLong: pensForm.descriptionLong.value.trim(),
@@ -3650,6 +3694,14 @@ const bindInteractions = () => {
   })
 
   document.addEventListener('input', (event) => {
+    const priceInput = event.target.matches('[data-admin-pens] input[name="price"]')
+      ? event.target
+      : event.target.closest?.('[data-admin-pens]')?.querySelector('input[name="price"]')
+    if (priceInput && event.target === priceInput) {
+      priceInput.value = formatPenPriceInput(priceInput.value)
+      return
+    }
+
     const imageInput = event.target.matches(
       'input[name="imageUrl"], input[name="image"], input[name="coverImage"], textarea[name="coverImage"], textarea[name="images"]',
     )
@@ -3837,7 +3889,7 @@ const bindAdminEntityPickers = () => {
       penForm.name.value = selected.name
       penForm.series.value = selected.series
       penForm.year.value = selected.year
-      penForm.price.value = selected.price || ''
+      penForm.price.value = formatPenPriceInput(selected.price)
       penForm.description.value = selected.description || ''
       penForm.descriptionLong.value = selected.descriptionLong || ''
       penForm.images.value = (selected.images || []).join('\n')
