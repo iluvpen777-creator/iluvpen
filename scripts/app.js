@@ -1820,7 +1820,7 @@ const renderHome = () => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
           </div>
         </article>`
@@ -1914,7 +1914,7 @@ const renderCollection = (params) => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
@@ -1945,7 +1945,7 @@ const renderPenDetail = (id) => {
         <article class="detail-panel">
           <h2>${escapeHtml(pen.name)}</h2>
           <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+          ${formatPenPrice(pen.price) ? `<p class="eyebrow purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
           <p class="muted">${escapeHtml(pen.description || '')}</p>
           ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>

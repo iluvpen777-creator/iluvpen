@@ -539,6 +539,10 @@ main {
 .pen-card .card-body p {
   font-size: 0.84rem;
 }
+.purchase-price-line {
+  white-space: nowrap;
+  line-height: 1.35;
+}
 
 .pen-card .carousel-image {
   aspect-ratio: 4 / 5;
@@ -1205,6 +1209,12 @@ select:focus {
 
   .site-header {
     top: 8px;
+
+@media (max-width: 720px) {
+  .purchase-price-line {
+    font-size: clamp(0.68rem, 2.5vw, 0.82rem);
+  }
+}
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
