@@ -150,7 +150,7 @@ const normalizePenPriceForStorage = (priceValue) => {
 const formatPenPrice = (priceValue) => {
   const amount = parsePenPriceNumber(priceValue)
   if (amount === null) return ''
-  return `USD ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`
+  return `EUR ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(amount)}`
 }
 
 const uid = () => `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
@@ -1820,7 +1820,7 @@ const renderHome = () => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
           </div>
         </article>`
@@ -1914,7 +1914,7 @@ const renderCollection = (params) => {
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
             <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-            ${formatPenPrice(pen.price) ? `<p class="muted">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+            ${formatPenPrice(pen.price) ? `<p class="muted">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
@@ -1945,7 +1945,7 @@ const renderPenDetail = (id) => {
         <article class="detail-panel">
           <h2>${escapeHtml(pen.name)}</h2>
           <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
-          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Price (USD) ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
+          ${formatPenPrice(pen.price) ? `<p class="eyebrow">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
           <p class="muted">${escapeHtml(pen.description || '')}</p>
           ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
@@ -2202,7 +2202,7 @@ const renderAdmin = () => {
           <label>Name<input name="name" required /></label>
           <label>Series<input name="series" required /></label>
           <label>Release year<input name="year" type="number" required /></label>
-          <label>Price (USD)<input name="price" inputmode="numeric" placeholder="1,250,000" /></label>
+          <label>Purchase Price<input name="price" inputmode="numeric" placeholder="1,250,000" /></label>
           <label>Description<textarea name="description" rows="2" required></textarea></label>
           <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
           <label>Image URLs (one per line)<textarea name="images" rows="4"></textarea></label>
@@ -3125,7 +3125,7 @@ const bindInteractions = () => {
       askAdminFields('Edit pen price', [
         {
           name: 'price',
-          label: 'Price (USD)',
+          label: 'Purchase Price',
           value: formatPenPriceInput(pen.price),
         },
       ]).then((values) => {
