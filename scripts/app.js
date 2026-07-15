@@ -1868,7 +1868,7 @@ const renderHome = () => {
         return `<article class="card news-card" data-open-news="${post.slug}">
           ${renderNewsThumbnailCarousel(post, 'home-news')}
           <div class="card-body">
-            <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min</p>
+            <p class="meta">${formatDate(post.publishedAt)}</p>
             <h3>${escapeHtml(post.title)}</h3>
             <p>${escapeHtml(post.subtitle)}</p>
             <a class="text-link" href="#/news/${post.slug}">Read</a>
@@ -2029,7 +2029,7 @@ const renderNewsList = () => {
         (post) => `<article class="card news-card" data-open-news="${post.slug}">
           ${renderNewsThumbnailCarousel(post, 'news-list')}
           <div class="card-body">
-            <p class="meta">${formatDate(post.publishedAt)} · ${post.category} · ${post.readingTime} min</p>
+            <p class="meta">${formatDate(post.publishedAt)} · ${post.category}</p>
             <h3>${escapeHtml(post.title)}</h3>
             <p>${escapeHtml(post.subtitle)}</p>
             <p class="muted">${renderHashtagLine(post.tags)}</p>
@@ -2059,7 +2059,7 @@ const renderNewsDetail = (slug) => {
       <p class="eyebrow">${escapeHtml(post.category)}</p>
       <h1>${escapeHtml(post.title)}</h1>
       <p class="lead">${escapeHtml(post.subtitle)}</p>
-      <p class="meta">${formatDate(post.publishedAt)} · ${post.readingTime} min read</p>
+      <p class="meta">${formatDate(post.publishedAt)}</p>
       <div class="article-cover-carousel">
         ${renderNewsThumbnailCarousel(post, 'news-detail')}
       </div>
@@ -2289,7 +2289,6 @@ const renderAdmin = () => {
             </div>
           </label>
           <label>Published at (ISO)<input name="publishedAt" placeholder="2026-07-11T09:00:00.000Z" /></label>
-          <label>Reading time (minutes)<input name="readingTime" type="number" min="1" value="5" /></label>
           <label>Content (Markdown)<textarea name="content" rows="6" required></textarea></label>
           <div class="editor-actions">
             <button type="submit" class="btn">Add/Update + Save</button>
@@ -3617,7 +3616,6 @@ const bindInteractions = () => {
         category: newsForm.category.value.trim(),
         tags: parseCsv(newsForm.tags.value),
         publishedAt: newsForm.publishedAt.value.trim() || new Date().toISOString(),
-        readingTime: Number(newsForm.readingTime.value || 5),
         content: newsForm.content.value,
       }
       upsertBy(state.news, 'slug', payload)
@@ -4016,7 +4014,6 @@ const bindAdminEntityPickers = () => {
       newsForm.tags.value = (selected.tags || []).join(', ')
       newsForm.coverImage.value = selected.coverImage || ''
       newsForm.publishedAt.value = selected.publishedAt || ''
-      newsForm.readingTime.value = selected.readingTime || 5
       newsForm.content.value = selected.content || ''
       syncImagePreviewForForm(newsForm)
     })
