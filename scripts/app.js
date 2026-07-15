@@ -164,7 +164,8 @@ const formatReleaseLabel = (pen = {}) => {
   const year = Number(pen.year || 0)
   const month = normalizeReleaseMonth(pen.releaseMonth)
   if (!month) return String(year)
-  return `${year}.${String(month).padStart(2, '0')}`
+  const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${year} ${monthShort[month - 1]}`
 }
 
 const formatPenPrice = (priceValue) => {
