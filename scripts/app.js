@@ -1960,7 +1960,7 @@ const renderCollection = (params) => {
             ${formatPenPrice(pen.price) ? `<p class="muted purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
             ${
               isAdmin()
-                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-release-inline="${pen.id}">Edit release</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
                 : ''
             }
           </div>
@@ -1993,7 +1993,7 @@ const renderPenDetail = (id) => {
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
           ${
             isAdmin()
-              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-release-inline="${pen.id}">Edit release</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
           <ul class="admin-photo-list">${pen.images
             .map(
               (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:up">Move up</button><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:down">Move down</button><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></div></li>`,
@@ -2766,6 +2766,7 @@ const bindInteractions = () => {
     const deleteNewsInline = event.target.closest('[data-admin-delete-news-inline]')
     const editPenTitleInline = event.target.closest('[data-admin-edit-pen-title-inline]')
     const editPenTextInline = event.target.closest('[data-admin-edit-pen-text-inline]')
+    const editPenReleaseInline = event.target.closest('[data-admin-edit-pen-release-inline]')
     const editPenKeywordsInline = event.target.closest('[data-admin-edit-pen-keywords-inline]')
     const editPenPriceInline = event.target.closest('[data-admin-edit-pen-price-inline]')
     const editNewsTitleInline = event.target.closest('[data-admin-edit-news-title-inline]')
@@ -2816,7 +2817,7 @@ const bindInteractions = () => {
     }
 
     const clickedAdminControl = event.target.closest(
-      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-edit-pen-keywords-inline],[data-admin-edit-pen-price-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-edit-pen-release-inline],[data-admin-edit-pen-keywords-inline],[data-admin-edit-pen-price-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
     const clickedLinkOrButton = event.target.closest('a, button, input, textarea, select, label')
@@ -3156,6 +3157,39 @@ const bindInteractions = () => {
         pen.descriptionLong = (values.descriptionLong || '').trim()
         savePen()
         alert('Pen text updated.')
+        render()
+      })
+      return
+    }
+
+    if (editPenReleaseInline) {
+      if (!isAdmin()) return
+      const id = editPenReleaseInline.dataset.adminEditPenReleaseInline
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminFields('Edit pen release', [
+        { name: 'year', label: 'Release year', value: String(Number(pen.year || 0) || '') },
+        {
+          name: 'releaseMonth',
+          label: 'Release month (optional, 1-12)',
+          value: String(normalizeReleaseMonth(pen.releaseMonth) || ''),
+        },
+      ]).then((values) => {
+        if (!values) return
+        const year = Number(values.year)
+        if (!Number.isInteger(year) || year < 1) {
+          alert('Release year must be a positive number.')
+          return
+        }
+        const normalizedMonth = normalizeReleaseMonth(values.releaseMonth)
+        if (String(values.releaseMonth || '').trim() && normalizedMonth === null) {
+          alert('Release month must be 1-12.')
+          return
+        }
+        pen.year = year
+        pen.releaseMonth = normalizedMonth
+        savePen()
+        alert('Pen release updated.')
         render()
       })
       return
