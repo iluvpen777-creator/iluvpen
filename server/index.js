@@ -308,7 +308,7 @@ const replaceCommentsMap = async (payload, expectedVersion = null) => {
     const nextVersion = currentVersion + 1
     await client.query(
       `update site_settings
-       set value_json = jsonb_build_object('version', $2),
+       set value_json = jsonb_build_object('version', $2::int),
            updated_at = now()
        where setting_key = $1`,
       [COMMENTS_MAP_VERSION_KEY, nextVersion],
