@@ -35,6 +35,7 @@ const STORAGE_KEYS = {
   users: 'iluvpen_users',
   community: 'iluvpen_community_posts',
   comments: 'iluvpen_comments',
+  commentsVersion: 'iluvpen_comments_version',
   cachedPens: 'iluvpen_cached_pens',
   cachedNews: 'iluvpen_cached_news',
   cachedCommunity: 'iluvpen_cached_community',
@@ -59,6 +60,8 @@ const state = {
   community: [],
   site: null,
   comments: {},
+  commentsVersion: 0,
+  commentActionBusy: {},
   commentSorts: {},
   lang: 'en',
   currentRoute: { page: 'home', param: '' },
@@ -931,6 +934,46 @@ const resolveObjectState = ({ apiValue, cachedKey, fileValue }) => {
 
   const cached = readCachedJson(cachedKey, null)
   if (cached && typeof cached === 'object' && !Array.isArray(cached)) return cached
+
+const parseCommentsVersion = (value) => {
+  const version = Number(value)
+  return Number.isFinite(version) && version >= 0 ? Math.floor(version) : 0
+}
+
+const isWrappedCommentsResponse = (value) => {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value) && ('comments' in value || 'version' in value)
+}
+
+const resolveCommentsState = ({ apiValue, cachedCommentsKey, cachedVersionKey, fileValue }) => {
+  if (isWrappedCommentsResponse(apiValue)) {
+    const comments = apiValue.comments && typeof apiValue.comments === 'object' && !Array.isArray(apiValue.comments) ? apiValue.comments : {}
+    const version = parseCommentsVersion(apiValue.version)
+    writeCachedJson(cachedCommentsKey, comments)
+    localStorage.setItem(cachedVersionKey, String(version))
+    return { comments, version }
+  }
+
+  if (apiValue && typeof apiValue === 'object' && !Array.isArray(apiValue)) {
+    const comments = apiValue
+    const version = parseCommentsVersion(localStorage.getItem(cachedVersionKey))
+    writeCachedJson(cachedCommentsKey, comments)
+    return { comments, version }
+  }
+
+  const cachedComments = readCachedJson(cachedCommentsKey, null)
+  if (cachedComments && typeof cachedComments === 'object' && !Array.isArray(cachedComments)) {
+    return {
+      comments: cachedComments,
+      version: parseCommentsVersion(localStorage.getItem(cachedVersionKey)),
+    }
+  }
+
+  if (fileValue && typeof fileValue === 'object' && !Array.isArray(fileValue)) {
+    return { comments: fileValue, version: 0 }
+  }
+
+  return { comments: {}, version: 0 }
+}
   return fileValue && typeof fileValue === 'object' && !Array.isArray(fileValue) ? fileValue : {}
 }
 
@@ -986,9 +1029,14 @@ const saveAdminCommentsSnapshot = () => {
   return apiRequest('/api/admin/comments-map', {
     method: 'PUT',
     headers: getAdminRequestHeaders(),
-    body: JSON.stringify({ comments: state.comments }),
-  }).then(() => {
+    body: JSON.stringify({ comments: state.comments, version: state.commentsVersion }),
+  }).then((result) => {
+    if (result && typeof result.version !== 'undefined') {
+      state.commentsVersion = parseCommentsVersion(result.version)
+      localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+    }
     writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+    return result
   })
 }
 
@@ -1025,6 +1073,26 @@ const getPersistFailureMessage = (error, fallbackMessage) => {
   return fallbackMessage
 }
 
+const setCommentsSnapshot = ({ comments, version }) => {
+  state.comments = comments && typeof comments === 'object' && !Array.isArray(comments) ? comments : {}
+  state.commentsVersion = parseCommentsVersion(version)
+  writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
+  localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+}
+
+const reloadCommentsFromServer = async () => {
+  if (!USE_REMOTE_DB) return null
+  const response = await apiRequest('/api/state/comments-map')
+  const snapshot = isWrappedCommentsResponse(response)
+    ? {
+        comments: response.comments,
+        version: response.version,
+      }
+    : { comments: response, version: parseCommentsVersion(localStorage.getItem(STORAGE_KEYS.commentsVersion)) }
+  setCommentsSnapshot(snapshot)
+  return snapshot
+}
+
 const saveComments = () => {
   if (isBlockedLocalMode()) {
     warnRemoteDbRequired()
@@ -1036,10 +1104,19 @@ const saveComments = () => {
   }
   return apiRequest('/api/state/comments-map', {
     method: 'PUT',
-    body: JSON.stringify({ comments: state.comments }),
-  }).then(() => {
+    body: JSON.stringify({ comments: state.comments, version: state.commentsVersion }),
+  }).then((result) => {
+    if (result && typeof result.version !== 'undefined') {
+      state.commentsVersion = parseCommentsVersion(result.version)
+      localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+    }
     writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
   }).catch((error) => {
+    if (String(error?.message || '').includes('API error: 409')) {
+      return reloadCommentsFromServer().then(() => {
+        alert('Comments were updated elsewhere. The latest version has been reloaded. Please try again.')
+      })
+    }
     console.error('Failed to save comments to DB:', error)
     alert(getPersistFailureMessage(error, 'Failed to save comments to DB. Please check API/DB status.'))
   })
@@ -1058,7 +1135,11 @@ const saveCommentLike = (commentId, likes) => {
   return apiRequest('/api/state/comment-like', {
     method: 'PATCH',
     body: JSON.stringify({ commentId, likes }),
-  }).then(() => {
+  }).then((result) => {
+    if (result && typeof result.version !== 'undefined') {
+      state.commentsVersion = parseCommentsVersion(result.version)
+      localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+    }
     writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
   }).catch((error) => {
     console.error('Failed to save comment like to DB:', error)
@@ -1307,22 +1388,51 @@ const getSortedComments = (targetId) => {
   return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
 
+const getCommentActionKey = (type, id) => `${type}:${id}`
+
+const isCommentActionBusy = (key) => Boolean(state.commentActionBusy?.[key])
+
+const setCommentActionBusy = (key, busy) => {
+  state.commentActionBusy ||= {}
+  if (busy) {
+    state.commentActionBusy[key] = true
+    return
+  }
+  delete state.commentActionBusy[key]
+}
+
+const renderBusyLabel = (label, busy) => {
+  if (!busy) return escapeHtml(label)
+  return `<span class="action-spinner" aria-hidden="true"></span><span>${escapeHtml(label)}</span>`
+}
+
+const renderBusyIconButton = (label, busy, extraClass = '') => {
+  const classes = `text-btn${extraClass ? ` ${extraClass}` : ''}${busy ? ' is-busy' : ''}`
+  return busy
+    ? `<button type="button" class="${classes}" disabled aria-busy="true"><span class="action-spinner" aria-hidden="true"></span><span>${escapeHtml(label)}</span></button>`
+    : `<button type="button" class="${classes}">${escapeHtml(label)}</button>`
+}
+
 const renderCommentList = (targetId) => {
   const comments = getSortedComments(targetId)
   if (!comments.length) return '<p class="muted">Be the first to leave a comment.</p>'
 
   return `<ul class="comment-list">${comments
     .map(
-      (comment) => `<li class="comment-item">
+      (comment) => {
+        const commentLikeBusy = isCommentActionBusy(getCommentActionKey('like', comment.id))
+        const commentDeleteBusy = isCommentActionBusy(getCommentActionKey('delete', comment.id))
+        const replyPostBusy = isCommentActionBusy(getCommentActionKey('reply', comment.id))
+        return `<li class="comment-item">
           <div class="comment-head">
             <div class="comment-head-main">
               ${renderUserAvatar(comment.nickname, 'sm', comment.profileImage || getProfileImageByNickname(comment.nickname))}
               <div class="comment-meta"><strong>${escapeHtml(comment.nickname)}</strong><span>${formatDate(comment.createdAt)}</span></div>
             </div>
-            <button data-like-comment="${comment.id}" type="button" class="text-btn comment-like-btn" aria-label="Like comment">
-              <span class="comment-like-icon ${hasLiked('comments', comment.id) ? 'liked' : ''}" aria-hidden="true">${
+            <button data-like-comment="${comment.id}" type="button" class="text-btn comment-like-btn${commentLikeBusy ? ' is-busy' : ''}" aria-label="Like comment" ${commentLikeBusy ? 'disabled aria-busy="true"' : ''}>
+              ${commentLikeBusy ? '<span class="action-spinner" aria-hidden="true"></span>' : `<span class="comment-like-icon ${hasLiked('comments', comment.id) ? 'liked' : ''}" aria-hidden="true">${
                 hasLiked('comments', comment.id) ? '&#9829;' : '&#9825;'
-              }</span>
+              }</span>`}
             </button>
           </div>
           <p class="comment-text">${renderMentionedText(comment.content)}</p>
@@ -1334,10 +1444,10 @@ const renderCommentList = (targetId) => {
             .join('')}
           <div class="comment-actions">
             <span class="comment-like-count">Likes ${comment.likes}</span>
-            <button data-reply-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn">Reply</button>
+            <button data-reply-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn${replyPostBusy ? ' is-busy' : ''}" ${replyPostBusy ? 'disabled aria-busy="true"' : ''}>${renderBusyLabel('Reply', replyPostBusy)}</button>
             ${
               canManageOwnedContent(comment.nickname)
-                ? `<button data-delete-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button>`
+                ? `<button data-delete-comment="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger${commentDeleteBusy ? ' is-busy' : ''}" ${commentDeleteBusy ? 'disabled aria-busy="true"' : ''}>${commentDeleteBusy ? '<span class="action-spinner" aria-hidden="true"></span><span>Delete</span>' : 'Delete'}</button>`
                 : ''
             }
           </div>
@@ -1346,29 +1456,34 @@ const renderCommentList = (targetId) => {
               Write a reply
               <textarea name="reply" rows="2" required placeholder="Use @nickname to mention someone"></textarea>
             </label>
-            <button type="submit" class="btn ghost">Post reply</button>
+            <button type="submit" class="btn ghost${replyPostBusy ? ' is-busy' : ''}" ${replyPostBusy ? 'disabled aria-busy="true"' : ''}>${renderBusyLabel('Post reply', replyPostBusy)}</button>
           </form>
           ${
             comment.replies?.length
               ? `<button type="button" class="text-btn reply-expand" data-toggle-replies="${targetId}:${comment.id}" data-reply-count="${comment.replies.length}">${getReplyToggleLabel(comment.replies.length, false)}</button>
               <ul class="reply-list" data-replies-list="${targetId}:${comment.id}" hidden>${comment.replies
                   .map(
-                    (reply) => `<li>
-                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div><button data-like-comment="${reply.id}" type="button" class="text-btn comment-like-btn" aria-label="Like reply"><span class="comment-like-icon ${hasLiked('comments', reply.id) ? 'liked' : ''}" aria-hidden="true">${
+                    (reply) => {
+                      const replyLikeBusy = isCommentActionBusy(getCommentActionKey('like', reply.id))
+                      const replyDeleteBusy = isCommentActionBusy(getCommentActionKey('reply-delete', reply.id))
+                      return `<li>
+                      <div class="comment-head"><div class="comment-head-main">${renderUserAvatar(reply.nickname, 'xs', reply.profileImage || getProfileImageByNickname(reply.nickname))}<div class="comment-meta"><strong>${escapeHtml(reply.nickname)}</strong><span>${formatDate(reply.createdAt)}</span></div></div><button data-like-comment="${reply.id}" type="button" class="text-btn comment-like-btn${replyLikeBusy ? ' is-busy' : ''}" aria-label="Like reply" ${replyLikeBusy ? 'disabled aria-busy="true"' : ''}>${replyLikeBusy ? '<span class="action-spinner" aria-hidden="true"></span>' : `<span class="comment-like-icon ${hasLiked('comments', reply.id) ? 'liked' : ''}" aria-hidden="true">${
                         hasLiked('comments', reply.id) ? '&#9829;' : '&#9825;'
-                      }</span></button></div>
+                      }</span>`}</button></div>
                       <p class="comment-text">${renderMentionedText(reply.content)}</p>
                       ${
                         canManageOwnedContent(reply.nickname)
-                          ? `<div class="comment-actions"><span class="comment-like-count">Likes ${Number(reply.likes || 0)}</span><button data-delete-reply="${reply.id}" data-parent-comment-id="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger">Delete</button></div>`
+                          ? `<div class="comment-actions"><span class="comment-like-count">Likes ${Number(reply.likes || 0)}</span><button data-delete-reply="${reply.id}" data-parent-comment-id="${comment.id}" data-target-id="${targetId}" type="button" class="text-btn danger${replyDeleteBusy ? ' is-busy' : ''}" ${replyDeleteBusy ? 'disabled aria-busy="true"' : ''}>${replyDeleteBusy ? '<span class="action-spinner" aria-hidden="true"></span><span>Delete</span>' : 'Delete'}</button></div>`
                           : `<div class="comment-actions"><span class="comment-like-count">Likes ${Number(reply.likes || 0)}</span></div>`
                       }
-                    </li>`,
+                    </li>`;
+                    },
                   )
                   .join('')}</ul>`
               : ''
           }
-        </li>`,
+        </li>`;
+      },
     )
     .join('')}</ul>`
 }
@@ -1393,7 +1508,7 @@ const renderCommentComposer = (targetId) => `
     <textarea name="comment" rows="2" required placeholder="Write a comment"></textarea>
     <div class="composer-actions">
       <button type="button" class="btn ghost" data-toggle-image-fields>Add image</button>
-      <button type="submit" class="btn">Post</button>
+          <button type="submit" class="btn${isCommentActionBusy(getCommentActionKey('post', targetId)) ? ' is-busy' : ''}" ${isCommentActionBusy(getCommentActionKey('post', targetId)) ? 'disabled aria-busy="true"' : ''}>${renderBusyLabel('Post', isCommentActionBusy(getCommentActionKey('post', targetId)))}</button>
     </div>
     <div class="image-fields" data-image-fields hidden>
       <label>
@@ -3030,10 +3145,15 @@ const bindInteractions = () => {
       if (!nickname) return
       const target = findCommentEntityById(likeComment.dataset.likeComment)
       if (!target) return
+      const actionKey = getCommentActionKey('like', target.entity.id)
       const nowLiked = toggleLikeMark('comments', target.entity.id)
       target.entity.likes = Math.max(0, Number(target.entity.likes || 0) + (nowLiked ? 1 : -1))
+      setCommentActionBusy(actionKey, true)
       syncCommentLikeUi(likeComment, nowLiked, target.entity.likes)
+      render()
       await saveCommentLike(target.entity.id, target.entity.likes)
+      setCommentActionBusy(actionKey, false)
+      render()
     }
 
     if (deleteComment) {
@@ -3042,19 +3162,31 @@ const bindInteractions = () => {
       const list = state.comments[targetId] || []
       const target = list.find((item) => item.id === commentId)
       if (!target || !canManageOwnedContent(target.nickname)) return
+      const actionKey = getCommentActionKey('delete', commentId)
+      setCommentActionBusy(actionKey, true)
       if (USE_REMOTE_DB && isAdmin()) {
         try {
-          await adminDeleteCommentEntry(commentId)
+          render()
+          const result = await adminDeleteCommentEntry(commentId)
+          if (result && typeof result.version !== 'undefined') {
+            state.commentsVersion = parseCommentsVersion(result.version)
+            localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+          }
           state.comments[targetId] = list.filter((item) => item.id !== commentId)
           writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
           render()
         } catch (error) {
           alert(error.message || 'Failed to delete comment.')
+        } finally {
+          setCommentActionBusy(actionKey, false)
+          render()
         }
         return
       }
       state.comments[targetId] = list.filter((item) => item.id !== commentId)
+      render()
       await saveComments()
+      setCommentActionBusy(actionKey, false)
       render()
     }
 
@@ -3067,19 +3199,31 @@ const bindInteractions = () => {
       if (!parent || !Array.isArray(parent.replies)) return
       const targetReply = parent.replies.find((item) => item.id === replyId)
       if (!targetReply || !canManageOwnedContent(targetReply.nickname)) return
+      const actionKey = getCommentActionKey('reply-delete', replyId)
+      setCommentActionBusy(actionKey, true)
       if (USE_REMOTE_DB && isAdmin()) {
         try {
-          await adminDeleteCommentEntry(replyId)
+          render()
+          const result = await adminDeleteCommentEntry(replyId)
+          if (result && typeof result.version !== 'undefined') {
+            state.commentsVersion = parseCommentsVersion(result.version)
+            localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+          }
           parent.replies = parent.replies.filter((item) => item.id !== replyId)
           writeCachedJson(STORAGE_KEYS.cachedComments, state.comments)
           render()
         } catch (error) {
           alert(error.message || 'Failed to delete reply.')
+        } finally {
+          setCommentActionBusy(actionKey, false)
+          render()
         }
         return
       }
       parent.replies = parent.replies.filter((item) => item.id !== replyId)
+      render()
       await saveComments()
+      setCommentActionBusy(actionKey, false)
       render()
     }
 
@@ -3451,6 +3595,8 @@ const bindInteractions = () => {
           const list = state.comments[targetId] || []
           const parent = list.find((item) => item.id === commentId)
           if (!parent) return
+          const actionKey = getCommentActionKey('reply', commentId)
+          setCommentActionBusy(actionKey, true)
           parent.replies ||= []
           parent.replies.push({
             id: uid(),
@@ -3460,7 +3606,9 @@ const bindInteractions = () => {
             likes: 0,
             createdAt: new Date().toISOString(),
           })
+          render()
           await saveComments()
+          setCommentActionBusy(actionKey, false)
           render()
           return
         }
@@ -3698,7 +3846,11 @@ const bindInteractions = () => {
       upsertBy(state.comments[targetId], 'id', payload)
       try {
         if (USE_REMOTE_DB) {
-          await saveAdminCommentsSnapshot()
+          const result = await saveAdminCommentsSnapshot()
+          if (result && typeof result.version !== 'undefined') {
+            state.commentsVersion = parseCommentsVersion(result.version)
+            localStorage.setItem(STORAGE_KEYS.commentsVersion, String(state.commentsVersion))
+          }
         } else {
           saveComments()
         }
@@ -3744,6 +3896,8 @@ const bindInteractions = () => {
       const content = commentForm.comment.value.trim()
       if (!content) return
       const images = await resolveImageInputs(commentForm.imageUrl.value, commentForm.imageFile)
+      const actionKey = getCommentActionKey('post', targetId)
+      setCommentActionBusy(actionKey, true)
       state.comments[targetId] ||= []
       state.comments[targetId].unshift({
         id: uid(),
@@ -3755,7 +3909,9 @@ const bindInteractions = () => {
         createdAt: new Date().toISOString(),
         replies: [],
       })
+      render()
       await saveComments()
+      setCommentActionBusy(actionKey, false)
       render()
       return
     }
@@ -4219,7 +4375,14 @@ export const bootstrapApp = async (rootEl) => {
     state.community = cachedCommunity ? JSON.parse(cachedCommunity) : community
   }
   if (USE_REMOTE_DB) {
-    state.comments = resolveObjectState({ apiValue: apiComments, cachedKey: STORAGE_KEYS.cachedComments, fileValue: commentsFromFile })
+    const commentsState = resolveCommentsState({
+      apiValue: apiComments,
+      cachedCommentsKey: STORAGE_KEYS.cachedComments,
+      cachedVersionKey: STORAGE_KEYS.commentsVersion,
+      fileValue: commentsFromFile,
+    })
+    state.comments = commentsState.comments
+    state.commentsVersion = commentsState.version
   } else if (isBlockedLocalMode()) {
     state.comments = commentsFromFile && typeof commentsFromFile === 'object' && !Array.isArray(commentsFromFile) ? commentsFromFile : {}
   } else {
@@ -4258,7 +4421,16 @@ export const bootstrapApp = async (rootEl) => {
           apiRequest('/api/state/comments-map'),
         ])
         if (Array.isArray(news)) state.news = news
-        if (comments && typeof comments === 'object' && !Array.isArray(comments)) state.comments = comments
+        if (comments && typeof comments === 'object' && !Array.isArray(comments)) {
+          const commentsState = resolveCommentsState({
+            apiValue: comments,
+            cachedCommentsKey: STORAGE_KEYS.cachedComments,
+            cachedVersionKey: STORAGE_KEYS.commentsVersion,
+            fileValue: commentsFromFile,
+          })
+          state.comments = commentsState.comments
+          state.commentsVersion = commentsState.version
+        }
         await maybeRunNotificationChecks()
       } catch {
         // ignore transient polling failures

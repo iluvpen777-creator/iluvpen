@@ -126,6 +126,7 @@ const mentionRegex = /(^|\s)@([a-zA-Z0-9_\-.]+)/g
 const ADMIN_NICKNAME = 'i_luv_pen'
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || 'iluvpen-admin')
 const ADMIN_TOKEN_SECRET = String(process.env.ADMIN_TOKEN_SECRET || ADMIN_PASSWORD)
+const COMMENTS_MAP_VERSION_KEY = 'comments_map_version'
 
 const authRateLimit = createRateLimit({
   scope: 'auth',
@@ -184,6 +185,40 @@ const extractMentions = (content = '') => {
   return [...new Set(mentions)]
 }
 
+const ensureCommentsMapVersionRow = async (client) => {
+  await client.query(
+    `insert into site_settings (setting_key, value_json, updated_at)
+     values ($1, '{"version":0}'::jsonb, now())
+     on conflict (setting_key)
+     do nothing`,
+    [COMMENTS_MAP_VERSION_KEY],
+  )
+}
+
+const readCommentsMapVersion = async (client = pool) => {
+  const result = await client.query(
+    `select coalesce((value_json->>'version')::int, 0) as version
+     from site_settings
+     where setting_key = $1
+     limit 1`,
+    [COMMENTS_MAP_VERSION_KEY],
+  )
+  return Number(result.rows[0]?.version || 0)
+}
+
+const incrementCommentsMapVersion = async (client) => {
+  await ensureCommentsMapVersionRow(client)
+  const result = await client.query(
+    `update site_settings
+     set value_json = jsonb_build_object('version', coalesce((value_json->>'version')::int, 0) + 1),
+         updated_at = now()
+     where setting_key = $1
+     returning (value_json->>'version')::int as version`,
+    [COMMENTS_MAP_VERSION_KEY],
+  )
+  return Number(result.rows[0]?.version || 0)
+}
+
 const findUserByNickname = async (nickname) => {
   return pool.query(
     `select id, nickname, password_hash, profile_image
@@ -194,10 +229,28 @@ const findUserByNickname = async (nickname) => {
   )
 }
 
-const replaceCommentsMap = async (payload) => {
+const replaceCommentsMap = async (payload, expectedVersion = null) => {
   const client = await pool.connect()
   try {
     await client.query('begin')
+    await ensureCommentsMapVersionRow(client)
+
+    const versionResult = await client.query(
+      `select coalesce((value_json->>'version')::int, 0) as version
+       from site_settings
+       where setting_key = $1
+       limit 1 for update`,
+      [COMMENTS_MAP_VERSION_KEY],
+    )
+    const currentVersion = Number(versionResult.rows[0]?.version || 0)
+    const normalizedExpectedVersion = expectedVersion == null ? null : Number(expectedVersion)
+    if (normalizedExpectedVersion != null && Number.isFinite(normalizedExpectedVersion) && normalizedExpectedVersion !== currentVersion) {
+      const conflictError = new Error('Comments have changed. Please refresh and try again.')
+      conflictError.statusCode = 409
+      conflictError.currentVersion = currentVersion
+      throw conflictError
+    }
+
     await client.query('delete from comment_mentions')
     await client.query('delete from comments')
 
@@ -252,7 +305,17 @@ const replaceCommentsMap = async (payload) => {
       }
     }
 
+    const nextVersion = currentVersion + 1
+    await client.query(
+      `update site_settings
+       set value_json = jsonb_build_object('version', $2),
+           updated_at = now()
+       where setting_key = $1`,
+      [COMMENTS_MAP_VERSION_KEY, nextVersion],
+    )
+
     await client.query('commit')
+    return nextVersion
   } catch (error) {
     await client.query('rollback')
     throw error
@@ -374,7 +437,8 @@ const getCommentsMapFromDb = async () => {
     }
     result[targetId] = comments
   }
-  return result
+  const version = await readCommentsMapVersion()
+  return { comments: result, version }
 }
 
 app.get('/api/health', (_req, res) => {
@@ -923,18 +987,30 @@ app.patch('/api/state/comment-like', commentLikeRateLimit, async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      `update comments
-       set likes = $2
-       where id = $1`,
-      [commentId, Math.max(0, Math.floor(likes))],
-    )
+    const client = await pool.connect()
+    try {
+      await client.query('begin')
+      const result = await client.query(
+        `update comments
+         set likes = $2
+         where id = $1`,
+        [commentId, Math.max(0, Math.floor(likes))],
+      )
 
-    if (!result.rowCount) {
-      return res.status(404).json({ ok: false, message: 'Comment not found' })
+      if (!result.rowCount) {
+        await client.query('rollback')
+        return res.status(404).json({ ok: false, message: 'Comment not found' })
+      }
+
+      const version = await incrementCommentsMapVersion(client)
+      await client.query('commit')
+      return res.json({ ok: true, commentId, likes: Math.max(0, Math.floor(likes)), version })
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally {
+      client.release()
     }
-
-    return res.json({ ok: true, commentId, likes: Math.max(0, Math.floor(likes)) })
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message })
   }
@@ -946,15 +1022,20 @@ app.put('/api/state/comments-map', commentWriteRateLimit, async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
   }
 
+  const expectedVersion = req.body?.version
+
   const validationError = validateCommentsPayload(payload)
   if (validationError) {
     return res.status(400).json({ ok: false, message: validationError })
   }
 
   try {
-    await replaceCommentsMap(payload)
-    res.json({ ok: true })
+    const version = await replaceCommentsMap(payload, expectedVersion)
+    res.json({ ok: true, version })
   } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({ ok: false, message: error.message, currentVersion: error.currentVersion })
+    }
     res.status(500).json({ ok: false, message: error.message })
   }
 })
@@ -965,23 +1046,28 @@ app.put('/api/admin/comments-map', requireAdminAuth, async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
   }
 
+  const expectedVersion = req.body?.version
+
   const validationError = validateCommentsPayload(payload)
   if (validationError) {
     return res.status(400).json({ ok: false, message: validationError })
   }
 
   try {
-    await replaceCommentsMap(payload)
+    const version = await replaceCommentsMap(payload, expectedVersion)
     await writeAdminAuditLog({
       req,
       action: 'admin.comments.replace_all',
       targetType: 'comments',
       targetId: 'all',
       before: null,
-      after: { targetCount: Object.keys(payload).length },
+      after: { targetCount: Object.keys(payload).length, version },
     })
-    res.json({ ok: true })
+    res.json({ ok: true, version })
   } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({ ok: false, message: error.message, currentVersion: error.currentVersion })
+    }
     res.status(500).json({ ok: false, message: error.message })
   }
 })
@@ -1001,21 +1087,34 @@ app.delete('/api/admin/comment/:id', requireAdminAuth, async (req, res) => {
       [id],
     )
 
-    const result = await pool.query('delete from comments where id = $1', [id])
-    if (!result.rowCount) {
-      return res.status(404).json({ ok: false, message: 'Comment not found.' })
+    const client = await pool.connect()
+    try {
+      await client.query('begin')
+      const result = await client.query('delete from comments where id = $1', [id])
+      if (!result.rowCount) {
+        await client.query('rollback')
+        return res.status(404).json({ ok: false, message: 'Comment not found.' })
+      }
+
+      const version = await incrementCommentsMapVersion(client)
+      await client.query('commit')
+
+      await writeAdminAuditLog({
+        req,
+        action: 'admin.comment.delete',
+        targetType: 'comment',
+        targetId: id,
+        before: beforeResult.rows[0] || null,
+        after: { version },
+      })
+
+      res.json({ ok: true, id, version })
+    } catch (error) {
+      await client.query('rollback')
+      throw error
+    } finally {
+      client.release()
     }
-
-    await writeAdminAuditLog({
-      req,
-      action: 'admin.comment.delete',
-      targetType: 'comment',
-      targetId: id,
-      before: beforeResult.rows[0] || null,
-      after: null,
-    })
-
-    res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message })
   }

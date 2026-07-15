@@ -359,6 +359,29 @@ main {
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
+.btn:disabled,
+.icon-btn:disabled,
+.text-btn:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.is-busy {
+  position: relative;
+}
+
+.action-spinner {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--muted), transparent 40%);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  vertical-align: -0.15em;
+}
+
 .btn:hover,
 .icon-btn:hover {
   transform: translateY(-2px);
@@ -1028,6 +1051,20 @@ select:focus {
   color: #4c4c4c;
 }
 
+.comment-like-btn.is-busy,
+.comment-actions .text-btn.is-busy,
+.reply-form .btn.is-busy,
+.comment-composer .btn.is-busy {
+  color: var(--muted);
+}
+
+.comment-like-btn.is-busy .action-spinner,
+.comment-actions .text-btn.is-busy .action-spinner,
+.reply-form .btn.is-busy .action-spinner,
+.comment-composer .btn.is-busy .action-spinner {
+  margin-right: 0;
+}
+
 .comment-like-icon {
   display: inline-flex;
   transform: translateY(1px);
@@ -1415,6 +1452,12 @@ select:focus {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
