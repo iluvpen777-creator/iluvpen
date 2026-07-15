@@ -934,6 +934,8 @@ const resolveObjectState = ({ apiValue, cachedKey, fileValue }) => {
 
   const cached = readCachedJson(cachedKey, null)
   if (cached && typeof cached === 'object' && !Array.isArray(cached)) return cached
+  return fileValue && typeof fileValue === 'object' && !Array.isArray(fileValue) ? fileValue : {}
+}
 
 const parseCommentsVersion = (value) => {
   const version = Number(value)
@@ -973,8 +975,6 @@ const resolveCommentsState = ({ apiValue, cachedCommentsKey, cachedVersionKey, f
   }
 
   return { comments: {}, version: 0 }
-}
-  return fileValue && typeof fileValue === 'object' && !Array.isArray(fileValue) ? fileValue : {}
 }
 
 const parseHashRoute = () => {
