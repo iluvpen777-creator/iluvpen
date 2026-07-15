@@ -163,6 +163,7 @@ const normalizePen = (row) => ({
   name: row.name,
   series: row.series,
   year: Number(row.year || 0),
+  releaseMonth: row.release_month == null ? null : Number(row.release_month),
   price: row.price || '',
   description: row.description || '',
   descriptionLong: row.description_long || '',
@@ -558,7 +559,7 @@ app.delete('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
 app.get('/api/state/pen', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `select id, name, series, year, price, description, description_long, keywords, images, created_at
+      `select id, name, series, year, release_month, price, description, description_long, keywords, images, created_at
        from pen_items
        order by created_at desc`,
     )
@@ -581,13 +582,18 @@ app.put('/api/state/pen', requireAdminAuth, async (req, res) => {
 
     for (const item of payload) {
       await client.query(
-        `insert into pen_items (id, name, series, year, price, description, description_long, keywords, images, created_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::timestamptz)`,
+        `insert into pen_items (id, name, series, year, release_month, price, description, description_long, keywords, images, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::timestamptz)`,
         [
           item.id,
           item.name,
           item.series,
           Number(item.year || 0),
+          (() => {
+            const parsed = Number(item.releaseMonth)
+            if (!Number.isInteger(parsed) || parsed < 1 || parsed > 12) return null
+            return parsed
+          })(),
           String(item.price || '').trim(),
           item.description || '',
           item.descriptionLong || '',

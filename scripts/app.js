@@ -147,6 +147,26 @@ const normalizePenPriceForStorage = (priceValue) => {
   return String(Math.trunc(amount))
 }
 
+const normalizeReleaseMonth = (monthValue) => {
+  const parsed = Number(monthValue)
+  if (!Number.isInteger(parsed)) return null
+  if (parsed < 1 || parsed > 12) return null
+  return parsed
+}
+
+const getReleaseSortKey = (pen = {}) => {
+  const year = Number(pen.year || 0)
+  const month = normalizeReleaseMonth(pen.releaseMonth) || 0
+  return year * 100 + month
+}
+
+const formatReleaseLabel = (pen = {}) => {
+  const year = Number(pen.year || 0)
+  const month = normalizeReleaseMonth(pen.releaseMonth)
+  if (!month) return String(year)
+  return `${year}.${String(month).padStart(2, '0')}`
+}
+
 const formatPenPrice = (priceValue) => {
   const amount = parsePenPriceNumber(priceValue)
   if (amount === null) return ''
@@ -1775,11 +1795,15 @@ const renderHashtagLine = (tags = []) =>
     .map((tag) => `#${escapeHtml(tag.replace(/^#/, ''))}`)
     .join(' ')
 
-const sortByYearThenCreatedAtDesc = (a, b) => b.year - a.year || new Date(b.createdAt) - new Date(a.createdAt)
+const sortByReleaseThenCreatedAtDesc = (a, b) => {
+  const releaseGap = getReleaseSortKey(b) - getReleaseSortKey(a)
+  if (releaseGap !== 0) return releaseGap
+  return new Date(b.createdAt) - new Date(a.createdAt)
+}
 
 const renderHome = () => {
-  const latestPens = [...state.pens].sort(sortByYearThenCreatedAtDesc).slice(0, 4)
-  const newestCollectionPen = [...state.pens].sort(sortByYearThenCreatedAtDesc)[0]
+  const latestPens = [...state.pens].sort(sortByReleaseThenCreatedAtDesc).slice(0, 4)
+  const newestCollectionPen = [...state.pens].sort(sortByReleaseThenCreatedAtDesc)[0]
   const heroImage = PROFILE_AVATAR_URL
   const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
@@ -1819,9 +1843,8 @@ const renderHome = () => {
           ${renderPenCarousel(pen)}
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
-            <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            <p class="meta">${escapeHtml(pen.series)} · ${formatReleaseLabel(pen)}</p>
             ${formatPenPrice(pen.price) ? `<p class="muted purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
-            <p>${escapeHtml(pen.description)}</p>
           </div>
         </article>`
       })
@@ -1875,21 +1898,23 @@ const renderCollection = (params) => {
 
   let filtered = [...state.pens].filter((pen) => {
     if (!search) return true
-    const target = [pen.name, pen.series, String(pen.year), pen.price || '', ...(pen.keywords || [])].join(' ').toLowerCase()
+    const target = [pen.name, pen.series, String(pen.year), String(pen.releaseMonth || ''), pen.price || '', ...(pen.keywords || [])]
+      .join(' ')
+      .toLowerCase()
     return target.includes(search)
   })
 
   if (sort === 'latest') {
     filtered.sort((a, b) => {
-      const byYear = Number(b.year || 0) - Number(a.year || 0)
-      if (byYear !== 0) return byYear
+      const byRelease = getReleaseSortKey(b) - getReleaseSortKey(a)
+      if (byRelease !== 0) return byRelease
       return new Date(b.createdAt) - new Date(a.createdAt)
     })
   }
   if (sort === 'oldest') {
     filtered.sort((a, b) => {
-      const byYear = Number(a.year || 0) - Number(b.year || 0)
-      if (byYear !== 0) return byYear
+      const byRelease = getReleaseSortKey(a) - getReleaseSortKey(b)
+      if (byRelease !== 0) return byRelease
       return new Date(a.createdAt) - new Date(b.createdAt)
     })
   }
@@ -1931,9 +1956,8 @@ const renderCollection = (params) => {
           ${renderPenCarousel(pen)}
           <div class="card-body">
             <h3>${escapeHtml(pen.name)}</h3>
-            <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+            <p class="meta">${escapeHtml(pen.series)} · ${formatReleaseLabel(pen)}</p>
             ${formatPenPrice(pen.price) ? `<p class="muted purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
-            <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
                 ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
@@ -1962,7 +1986,7 @@ const renderPenDetail = (id) => {
         </div>
         <article class="detail-panel">
           <h2>${escapeHtml(pen.name)}</h2>
-          <p class="meta">${escapeHtml(pen.series)} · ${pen.year}</p>
+          <p class="meta">${escapeHtml(pen.series)} · ${formatReleaseLabel(pen)}</p>
           ${formatPenPrice(pen.price) ? `<p class="eyebrow purchase-price-line">Purchase Price ${escapeHtml(formatPenPrice(pen.price))}</p>` : ''}
           <p class="muted">${escapeHtml(pen.description || '')}</p>
           ${pen.descriptionLong ? `<p>${escapeHtml(pen.descriptionLong)}</p>` : ''}
@@ -2220,6 +2244,7 @@ const renderAdmin = () => {
           <label>Name<input name="name" required /></label>
           <label>Series<input name="series" required /></label>
           <label>Release year<input name="year" type="number" required /></label>
+          <label>Release month (optional)<input name="releaseMonth" type="number" min="1" max="12" placeholder="1-12" /></label>
           <label>Purchase Price<input name="price" inputmode="numeric" placeholder="1,250,000" /></label>
           <label>Description<textarea name="description" rows="2" required></textarea></label>
           <label>Detailed description<textarea name="descriptionLong" rows="3"></textarea></label>
@@ -3530,6 +3555,7 @@ const bindInteractions = () => {
         name: pensForm.name.value.trim(),
         series: pensForm.series.value.trim(),
         year: Number(pensForm.year.value),
+        releaseMonth: normalizeReleaseMonth(pensForm.releaseMonth.value),
         price: normalizePenPriceForStorage(pensForm.price.value),
         createdAt: new Date().toISOString(),
         description: pensForm.description.value.trim(),
@@ -3758,13 +3784,15 @@ const bindInteractions = () => {
     const results = []
 
     for (const pen of state.pens) {
-      const target = [pen.name, pen.series, pen.year, pen.price || '', pen.description, ...(pen.keywords || [])].join(' ').toLowerCase()
+      const target = [pen.name, pen.series, pen.year, pen.releaseMonth || '', pen.price || '', pen.description, ...(pen.keywords || [])]
+        .join(' ')
+        .toLowerCase()
       if (!target.includes(q)) continue
       results.push({
         type: 'Collection',
         href: `#/pen/${pen.id}`,
         title: pen.name,
-        meta: `${pen.series} · ${pen.year}${formatPenPrice(pen.price) ? ` · ${formatPenPrice(pen.price)}` : ''}`,
+        meta: `${pen.series} · ${formatReleaseLabel(pen)}${formatPenPrice(pen.price) ? ` · ${formatPenPrice(pen.price)}` : ''}`,
       })
     }
 
@@ -3929,6 +3957,7 @@ const bindAdminEntityPickers = () => {
       penForm.name.value = selected.name
       penForm.series.value = selected.series
       penForm.year.value = selected.year
+      penForm.releaseMonth.value = normalizeReleaseMonth(selected.releaseMonth) || ''
       penForm.price.value = formatPenPriceInput(selected.price)
       penForm.description.value = selected.description || ''
       penForm.descriptionLong.value = selected.descriptionLong || ''

@@ -35,6 +35,7 @@ create table if not exists pen_items (
   name text not null,
   series text not null,
   year integer not null,
+  release_month integer,
   price text,
   description text,
   description_long text,
@@ -45,6 +46,9 @@ create table if not exists pen_items (
 
 alter table pen_items
   add column if not exists price text;
+
+alter table pen_items
+  add column if not exists release_month integer;
 
 create table if not exists site_settings (
   setting_key text primary key,
