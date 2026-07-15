@@ -1174,7 +1174,7 @@ const maybeNotifyMentions = async () => {
 
   if (freshMentions.length) {
     for (const mention of freshMentions.slice(-3)) {
-      await notifyUser('Community update', {
+      await notifyUser('Activity update', {
         body: `${mention.author}: ${String(mention.content).slice(0, 80)}`,
         data: { url: `${location.origin}${location.pathname}#/${mention.targetId.startsWith('news:') ? 'news/' + mention.targetId.replace('news:', '') : 'community/' + mention.targetId.replace('community:', '')}` },
       })
@@ -2240,7 +2240,11 @@ const renderAbout = () => `
     <div class="grid cards-2">
       <article class="card"><div class="card-body"><h3>Archive</h3><p>JSON-driven architecture designed to scale to thousands of pen entries.</p></div></article>
       <article class="card"><div class="card-body"><h3>News</h3><p>Long-form markdown articles with code blocks, captions, categories, and tags.</p></div></article>
-      <article class="card"><div class="card-body"><h3>Community</h3><p>Nickname-based participation without mandatory sign-up.</p></div></article>
+      ${
+        isCommunityEnabled()
+          ? '<article class="card"><div class="card-body"><h3>Community</h3><p>Nickname-based participation without mandatory sign-up.</p></div></article>'
+          : ''
+      }
       <article class="card"><div class="card-body"><h3>Open & Free</h3><p>Near-zero-cost hosting via GitHub Pages and GitHub Actions.</p></div></article>
     </div>
   </section>
@@ -2514,7 +2518,7 @@ const renderAccountManageModal = () => {
     const notificationStatus = notificationSupported
       ? Notification.permission === 'denied'
         ? 'Browser notification permission is blocked. Enable it in browser settings to turn notifications on.'
-        : 'Receive notifications for new articles and community updates.'
+        : 'Receive notifications for new articles and activity updates.'
       : 'This browser does not support notifications.'
 
     return `
@@ -2604,7 +2608,7 @@ const renderNotificationConsentModal = () => {
       <div class="section-head">
         <h3>Notification settings</h3>
       </div>
-      <p class="muted consent-copy">Would you like to receive new article and community update notifications?</p>
+      <p class="muted consent-copy">Would you like to receive new article and activity update notifications?</p>
       <div class="editor-actions">
         <button type="button" class="btn" data-notification-consent="accept">Enable notifications</button>
         <button type="button" class="btn ghost" data-notification-consent="decline">Not now</button>
@@ -2628,7 +2632,7 @@ const renderLayout = () => {
   if (state.currentRoute.page === 'community') {
     pageHtml = communityEnabled
       ? renderCommunity(params, state.currentRoute.param)
-      : '<section class="section"><h2>Community is currently hidden.</h2><p class="muted">You can enable it from Admin Panel → Site Settings.</p></section>'
+      : renderHome()
   }
   if (state.currentRoute.page === 'about') pageHtml = renderAbout()
   if (state.currentRoute.page === 'search') pageHtml = renderSearch()
@@ -3956,6 +3960,12 @@ const registerServiceWorker = () => {
 
 const render = () => {
   state.currentRoute = parseHashRoute()
+  if (!isCommunityEnabled() && state.currentRoute.page === 'community') {
+    state.currentRoute = { page: 'home', param: '' }
+    if (location.hash.startsWith('#/community')) {
+      history.replaceState({}, '', `${location.pathname}${location.search}#/home`)
+    }
+  }
   renderLayout()
   enhanceRenderedArticleMarkdown()
   bindAdminEntityPickers()
