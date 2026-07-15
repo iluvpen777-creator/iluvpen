@@ -1879,11 +1879,30 @@ const renderCollection = (params) => {
     return target.includes(search)
   })
 
-  if (sort === 'oldest') filtered.sort((a, b) => a.year - b.year)
-  if (sort === 'name') filtered.sort((a, b) => a.name.localeCompare(b.name))
-  if (sort === 'year') filtered.sort(sortByYearThenCreatedAtDesc)
-  if (sort === 'series') filtered.sort((a, b) => a.series.localeCompare(b.series))
-  if (sort === 'latest') filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  if (sort === 'latest') {
+    filtered.sort((a, b) => {
+      const byYear = Number(b.year || 0) - Number(a.year || 0)
+      if (byYear !== 0) return byYear
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+  }
+  if (sort === 'oldest') {
+    filtered.sort((a, b) => {
+      const byYear = Number(a.year || 0) - Number(b.year || 0)
+      if (byYear !== 0) return byYear
+      return new Date(a.createdAt) - new Date(b.createdAt)
+    })
+  }
+  if (sort === 'price-high') {
+    filtered.sort((a, b) => {
+      return (parsePenPriceNumber(b.price) || 0) - (parsePenPriceNumber(a.price) || 0)
+    })
+  }
+  if (sort === 'price-low') {
+    filtered.sort((a, b) => {
+      return (parsePenPriceNumber(a.price) || 0) - (parsePenPriceNumber(b.price) || 0)
+    })
+  }
 
   return `
   <section class="section reveal">
@@ -1899,11 +1918,10 @@ const renderCollection = (params) => {
       <label>
         Sort
         <select name="sort">
-          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest</option>
-          <option value="oldest" ${sort === 'oldest' ? 'selected' : ''}>Oldest</option>
-          <option value="name" ${sort === 'name' ? 'selected' : ''}>Name</option>
-          <option value="year" ${sort === 'year' ? 'selected' : ''}>Release year</option>
-          <option value="series" ${sort === 'series' ? 'selected' : ''}>Series</option>
+          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest : 최신발매순</option>
+          <option value="oldest" ${sort === 'oldest' ? 'selected' : ''}>Oldest : 옛날발매순</option>
+          <option value="price-high" ${sort === 'price-high' ? 'selected' : ''}>Price High to Low : 가격 높은순</option>
+          <option value="price-low" ${sort === 'price-low' ? 'selected' : ''}>Price Low to High : 가격낮은순</option>
         </select>
       </label>
     </form>
@@ -1918,7 +1936,7 @@ const renderCollection = (params) => {
             <p>${escapeHtml(pen.description)}</p>
             ${
               isAdmin()
-                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
+                ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete</button></div>`
                 : ''
             }
           </div>
@@ -1951,7 +1969,7 @@ const renderPenDetail = (id) => {
           <ul class="tag-list">${(pen.keywords || []).map((tag) => `<li>${escapeHtml(tag)}</li>`).join('')}</ul>
           ${
             isAdmin()
-              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
+              ? `<div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-edit-pen-title-inline="${pen.id}">Edit title</button><button type="button" class="text-btn" data-admin-edit-pen-text-inline="${pen.id}">Edit text</button><button type="button" class="text-btn" data-admin-edit-pen-keywords-inline="${pen.id}">Edit keywords</button><button type="button" class="text-btn" data-admin-edit-pen-price-inline="${pen.id}">Edit price</button><button type="button" class="text-btn" data-admin-add-pen-image="${pen.id}">Add photo</button><button type="button" class="text-btn danger" data-admin-delete-pen-inline="${pen.id}">Delete pen</button></div>
           <ul class="admin-photo-list">${pen.images
             .map(
               (img, idx) => `<li><img src="${escapeHtml(img)}" alt="Managed image ${idx + 1}" loading="lazy" /><div class="admin-inline-actions"><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:up">Move up</button><button type="button" class="text-btn" data-admin-move-pen-image="${pen.id}:${idx}:down">Move down</button><button type="button" class="text-btn danger" data-admin-delete-pen-image="${pen.id}:${idx}">Delete photo</button></div></li>`,
@@ -2723,6 +2741,7 @@ const bindInteractions = () => {
     const deleteNewsInline = event.target.closest('[data-admin-delete-news-inline]')
     const editPenTitleInline = event.target.closest('[data-admin-edit-pen-title-inline]')
     const editPenTextInline = event.target.closest('[data-admin-edit-pen-text-inline]')
+    const editPenKeywordsInline = event.target.closest('[data-admin-edit-pen-keywords-inline]')
     const editPenPriceInline = event.target.closest('[data-admin-edit-pen-price-inline]')
     const editNewsTitleInline = event.target.closest('[data-admin-edit-news-title-inline]')
     const editNewsTextInline = event.target.closest('[data-admin-edit-news-text-inline]')
@@ -2772,7 +2791,7 @@ const bindInteractions = () => {
     }
 
     const clickedAdminControl = event.target.closest(
-      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-edit-pen-price-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
+      '[data-admin-edit-pen-title-inline],[data-admin-edit-pen-text-inline],[data-admin-edit-pen-keywords-inline],[data-admin-edit-pen-price-inline],[data-admin-delete-pen-inline],[data-admin-add-pen-image],[data-admin-delete-pen-image],[data-admin-move-pen-image],[data-admin-edit-news-title-inline],[data-admin-edit-news-text-inline],[data-admin-edit-news-cover-inline],[data-admin-delete-news-inline]',
     )
 
     const clickedLinkOrButton = event.target.closest('a, button, input, textarea, select, label')
@@ -3112,6 +3131,27 @@ const bindInteractions = () => {
         pen.descriptionLong = (values.descriptionLong || '').trim()
         savePen()
         alert('Pen text updated.')
+        render()
+      })
+      return
+    }
+
+    if (editPenKeywordsInline) {
+      if (!isAdmin()) return
+      const id = editPenKeywordsInline.dataset.adminEditPenKeywordsInline
+      const pen = state.pens.find((p) => p.id === id)
+      if (!pen) return
+      askAdminFields('Edit collection related words', [
+        {
+          name: 'keywords',
+          label: 'Related words (comma-separated)',
+          value: (pen.keywords || []).join(', '),
+        },
+      ]).then((values) => {
+        if (!values) return
+        pen.keywords = parseCsv(values.keywords || '')
+        savePen()
+        alert('Collection related words updated.')
         render()
       })
       return
