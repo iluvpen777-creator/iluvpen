@@ -1918,10 +1918,10 @@ const renderCollection = (params) => {
       <label>
         Sort
         <select name="sort">
-          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest : 최신발매순</option>
-          <option value="oldest" ${sort === 'oldest' ? 'selected' : ''}>Oldest : 옛날발매순</option>
-          <option value="price-high" ${sort === 'price-high' ? 'selected' : ''}>Price High to Low : 가격 높은순</option>
-          <option value="price-low" ${sort === 'price-low' ? 'selected' : ''}>Price Low to High : 가격낮은순</option>
+          <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest</option>
+          <option value="oldest" ${sort === 'oldest' ? 'selected' : ''}>Oldest</option>
+          <option value="price-high" ${sort === 'price-high' ? 'selected' : ''}>Price High to Low</option>
+          <option value="price-low" ${sort === 'price-low' ? 'selected' : ''}>Price Low to High</option>
         </select>
       </label>
     </form>
