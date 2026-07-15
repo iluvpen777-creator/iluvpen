@@ -91,3 +91,21 @@ create table if not exists comment_mentions (
 
 create index if not exists idx_comment_mentions_comment_id on comment_mentions(comment_id);
 create index if not exists idx_comment_mentions_nickname on comment_mentions(mentioned_nickname);
+
+create table if not exists admin_audit_logs (
+  id bigserial primary key,
+  actor_nickname text not null,
+  action text not null,
+  target_type text not null,
+  target_id text not null default '',
+  before_json jsonb,
+  after_json jsonb,
+  metadata_json jsonb not null default '{}'::jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_admin_audit_logs_created_at on admin_audit_logs(created_at desc);
+create index if not exists idx_admin_audit_logs_action on admin_audit_logs(action);
+create index if not exists idx_admin_audit_logs_target on admin_audit_logs(target_type, target_id);

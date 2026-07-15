@@ -54,6 +54,28 @@ npm run db:check
 
 정상 연결이면 DB 이름과 서버 시간이 출력됩니다.
 
+### 3-1) DB 백업/복구
+
+운영 전 `npm run db:migrate`로 최신 스키마를 반영한 뒤 사용하세요.
+
+백업 생성:
+
+```bash
+npm run db:backup
+```
+
+- 기본 저장 경로: `backups/backup-YYYY-MM-DDTHH-MM-SS-sssZ.json`
+- 경로 지정: `npm run db:backup -- backups/my-backup.json`
+
+복구 실행:
+
+```bash
+npm run db:restore -- backups/backup-2026-07-15T12-30-00-000Z.json
+```
+
+- 파일 경로를 생략하면 `backups/`의 최신 파일을 자동 복구합니다.
+- 복구는 트랜잭션으로 실행되며, 대상 테이블을 초기화 후 백업 데이터를 재적재합니다.
+
 ### 4) 프론트 + API 동시 실행
 
 ```bash

@@ -121,6 +121,8 @@ const localizeHtml = (html) => {
   return localized
 }
 
+const isCommunityEnabled = () => Boolean(state.site?.communityEnabled)
+
 const formatDate = (dateValue) => {
   const d = new Date(dateValue)
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
@@ -1808,6 +1810,7 @@ const renderHome = () => {
   const heroImage = PROFILE_AVATAR_URL
   const latestNews = [...state.news].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 4)
   const hotCommunity = [...state.community].sort((a, b) => b.likes - a.likes).slice(0, 3)
+  const communityEnabled = isCommunityEnabled()
 
   const fillQuadSlots = (items) => {
     if (items.length >= 4) return items
@@ -1827,7 +1830,7 @@ const renderHome = () => {
         <div class="hero-actions">
           <a class="btn home-white-btn" href="#/collection">View Collection</a>
           <a class="btn home-white-btn" href="#/news">Latest News</a>
-          <a class="btn home-white-btn" href="#/community">Community</a>
+          ${communityEnabled ? '<a class="btn home-white-btn" href="#/community">Community</a>' : ''}
         </div>
       </div>
     </section>
@@ -1857,7 +1860,7 @@ const renderHome = () => {
       <h2>Latest News</h2>
       <div class="home-news-actions">
         <a class="btn home-white-btn" href="#/news">News</a>
-        <a class="btn home-white-btn" href="#/community">Community</a>
+        ${communityEnabled ? '<a class="btn home-white-btn" href="#/community">Community</a>' : ''}
       </div>
     </div>
     <div class="grid home-quad-grid">${latestNewsQuad
@@ -1878,7 +1881,9 @@ const renderHome = () => {
       .join('')}</div>
   </section>
 
-  <section class="section reveal">
+  ${
+    communityEnabled
+      ? `<section class="section reveal">
     <div class="section-head"><h2>Community Highlights</h2><a href="#/community">Community</a></div>
     <div class="list">${hotCommunity
       .map(
@@ -1889,7 +1894,9 @@ const renderHome = () => {
         </a>`,
       )
       .join('')}</div>
-  </section>
+  </section>`
+      : ''
+  }
   `
 }
 
@@ -2089,7 +2096,17 @@ const renderNewsDetail = (slug) => {
 
 const renderCommunityBoard = (params) => {
   const sort = params.get('sort') || 'latest'
-  const posts = getSortedCommunity(sort)
+  const q = (params.get('q') || '').trim().toLowerCase()
+  const period = params.get('period') || 'all'
+  const cutoffMs =
+    period === '7d' ? Date.now() - 7 * 24 * 60 * 60 * 1000 : period === '30d' ? Date.now() - 30 * 24 * 60 * 60 * 1000 : 0
+
+  const posts = getSortedCommunity(sort).filter((post) => {
+    if (cutoffMs && new Date(post.createdAt).getTime() < cutoffMs) return false
+    if (!q) return true
+    const target = [post.title, post.content, post.nickname].join(' ').toLowerCase()
+    return target.includes(q)
+  })
 
   return `
   <section class="section reveal">
@@ -2099,11 +2116,23 @@ const renderCommunityBoard = (params) => {
     </div>
     <form class="filter-bar" data-community-sort>
       <label>
+        Search
+        <input type="search" name="q" value="${escapeHtml(q)}" placeholder="Title, content, author" />
+      </label>
+      <label>
         Sort
         <select name="sort">
           <option value="latest" ${sort === 'latest' ? 'selected' : ''}>Newest</option>
           <option value="popular" ${sort === 'popular' ? 'selected' : ''}>Most liked</option>
           <option value="comments" ${sort === 'comments' ? 'selected' : ''}>Most commented</option>
+        </select>
+      </label>
+      <label>
+        Period
+        <select name="period">
+          <option value="all" ${period === 'all' ? 'selected' : ''}>All time</option>
+          <option value="7d" ${period === '7d' ? 'selected' : ''}>Last 7 days</option>
+          <option value="30d" ${period === '30d' ? 'selected' : ''}>Last 30 days</option>
         </select>
       </label>
     </form>
@@ -2188,12 +2217,16 @@ const renderCommunity = (params, postId = '') => {
 }
 
 const renderSearch = () => {
+  const searchPlaceholder = isCommunityEnabled()
+    ? 'Collection, news, community keyword'
+    : 'Collection, news keyword'
+
   return `
   <section class="section reveal">
     <h2>Search Archive</h2>
     <label>
       Live search
-      <input type="search" data-global-search placeholder="Collection, news, community keyword" />
+      <input type="search" data-global-search placeholder="${searchPlaceholder}" />
     </label>
     <div id="search-results" class="list"></div>
   </section>
@@ -2299,6 +2332,21 @@ const renderAdmin = () => {
       </details></article>
 
       <article class="card"><details class="admin-panel-fold">
+        <summary class="admin-panel-toggle">Site Settings (DB)</summary>
+        <div class="card-body">
+          <form class="admin-editor" data-admin-site>
+          <label>
+            <span>Enable Community</span>
+            <input name="communityEnabled" type="checkbox" ${isCommunityEnabled() ? 'checked' : ''} />
+          </label>
+          <div class="editor-actions">
+            <button type="submit" class="btn">Save settings</button>
+          </div>
+          </form>
+        </div>
+      </details></article>
+
+      <article class="card"><details class="admin-panel-fold">
         <summary class="admin-panel-toggle">Comment Management (DB)</summary>
         <div class="card-body">
           <form class="admin-editor" data-admin-comments>
@@ -2339,7 +2387,7 @@ const renderHeader = () => `
     <a href="#/home">Home</a>
     <a href="#/collection">Collection</a>
     <a href="#/news">News</a>
-    <a href="#/community">Community</a>
+    ${isCommunityEnabled() ? '<a href="#/community">Community</a>' : ''}
     <a href="#/about">About</a>
     <a href="#/search">Search</a>
   </nav>
@@ -2569,6 +2617,7 @@ const renderNotificationConsentModal = () => {
 const renderLayout = () => {
   const app = document.querySelector('#app')
   const params = new URLSearchParams(location.search)
+  const communityEnabled = isCommunityEnabled()
 
   let pageHtml = ''
   if (state.currentRoute.page === 'home') pageHtml = renderHome()
@@ -2576,7 +2625,11 @@ const renderLayout = () => {
   if (state.currentRoute.page === 'pen') pageHtml = renderPenDetail(state.currentRoute.param)
   if (state.currentRoute.page === 'news' && !state.currentRoute.param) pageHtml = renderNewsList()
   if (state.currentRoute.page === 'news' && state.currentRoute.param) pageHtml = renderNewsDetail(state.currentRoute.param)
-  if (state.currentRoute.page === 'community') pageHtml = renderCommunity(params, state.currentRoute.param)
+  if (state.currentRoute.page === 'community') {
+    pageHtml = communityEnabled
+      ? renderCommunity(params, state.currentRoute.param)
+      : '<section class="section"><h2>Community is currently hidden.</h2><p class="muted">You can enable it from Admin Panel → Site Settings.</p></section>'
+  }
   if (state.currentRoute.page === 'about') pageHtml = renderAbout()
   if (state.currentRoute.page === 'search') pageHtml = renderSearch()
   if (state.currentRoute.page === 'admin') pageHtml = renderAdmin()
@@ -3568,13 +3621,12 @@ const bindInteractions = () => {
 
     if (siteForm) {
       event.preventDefault()
-      const images = await resolveImageInputs(siteForm.homeHeroImage.value, siteForm.imageFile)
       state.site = {
         ...(state.site && typeof state.site === 'object' ? state.site : {}),
-        homeHeroImage: images[0] || '',
+        communityEnabled: Boolean(siteForm.communityEnabled?.checked),
       }
       saveSite()
-      alert('Home hero image saved.')
+      alert('Site settings saved.')
       render()
       return
     }
@@ -3777,8 +3829,14 @@ const bindInteractions = () => {
 
     if (communitySort) {
       const sort = communitySort.sort.value
+      const q = communitySort.q?.value?.trim() || ''
+      const period = communitySort.period?.value || 'all'
       const qs = new URLSearchParams(location.search)
       qs.set('sort', sort)
+      if (q) qs.set('q', q)
+      else qs.delete('q')
+      if (period && period !== 'all') qs.set('period', period)
+      else qs.delete('period')
       history.replaceState({}, '', `${location.pathname}?${qs.toString()}${location.hash}`)
       render()
     }
@@ -3793,6 +3851,25 @@ const bindInteractions = () => {
   })
 
   document.addEventListener('input', (event) => {
+    const communityFilterQuery = event.target.matches('[data-community-sort] input[name="q"]')
+      ? event.target
+      : null
+    if (communityFilterQuery) {
+      const form = communityFilterQuery.closest('[data-community-sort]')
+      const sort = form?.sort?.value || 'latest'
+      const q = communityFilterQuery.value.trim()
+      const period = form?.period?.value || 'all'
+      const qs = new URLSearchParams(location.search)
+      qs.set('sort', sort)
+      if (q) qs.set('q', q)
+      else qs.delete('q')
+      if (period && period !== 'all') qs.set('period', period)
+      else qs.delete('period')
+      history.replaceState({}, '', `${location.pathname}?${qs.toString()}${location.hash}`)
+      render()
+      return
+    }
+
     const priceInput = event.target.matches('[data-admin-pens] input[name="price"]')
       ? event.target
       : event.target.closest?.('[data-admin-pens]')?.querySelector('input[name="price"]')
@@ -3840,15 +3917,17 @@ const bindInteractions = () => {
       })
     }
 
-    for (const post of state.community) {
-      const target = [post.title, post.content, post.nickname].join(' ').toLowerCase()
-      if (!target.includes(q)) continue
-      results.push({
-        type: 'Community',
-        href: `#/community/${post.id}`,
-        title: post.title,
-        meta: `${post.nickname} · Likes ${Number(post.likes || 0)}`,
-      })
+    if (isCommunityEnabled()) {
+      for (const post of state.community) {
+        const target = [post.title, post.content, post.nickname].join(' ').toLowerCase()
+        if (!target.includes(q)) continue
+        results.push({
+          type: 'Community',
+          href: `#/community/${post.id}`,
+          title: post.title,
+          meta: `${post.nickname} · Likes ${Number(post.likes || 0)}`,
+        })
+      }
     }
 
     const container = document.querySelector('#search-results')
@@ -3978,6 +4057,7 @@ const ensureTestCommentsSeed = () => {
 const bindAdminEntityPickers = () => {
   const penForm = document.querySelector('[data-admin-pens]')
   const newsForm = document.querySelector('[data-admin-news]')
+  const siteForm = document.querySelector('[data-admin-site]')
 
   if (penForm) {
     penForm.pick.addEventListener('change', () => {
@@ -4017,6 +4097,10 @@ const bindAdminEntityPickers = () => {
       newsForm.content.value = selected.content || ''
       syncImagePreviewForForm(newsForm)
     })
+  }
+
+  if (siteForm) {
+    siteForm.communityEnabled.checked = Boolean(state.site?.communityEnabled)
   }
 
   document.querySelectorAll('form').forEach((form) => {

@@ -11,7 +11,9 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
     "start:api": "node server/index.js",
     "db:check": "node server/check-db.js",
-    "db:migrate": "node server/apply-schema.js"
+    "db:migrate": "node server/apply-schema.js",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:restore": "node scripts/db-restore.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

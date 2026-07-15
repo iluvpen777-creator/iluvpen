@@ -18,6 +18,64 @@ const corsOrigin = process.env.CORS_ORIGIN
 app.use(cors({ origin: corsOrigin }))
 app.use(express.json({ limit: jsonBodyLimit }))
 
+const getClientIp = (req) => {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  if (forwarded) return forwarded
+  return String(req.ip || req.socket?.remoteAddress || 'unknown')
+}
+
+const rateBuckets = new Map()
+
+const hitRateLimit = ({ key, limit, windowMs }) => {
+  const now = Date.now()
+  const windowStart = now - windowMs
+  const bucket = rateBuckets.get(key) || []
+  const recent = bucket.filter((ts) => ts > windowStart)
+
+  if (recent.length >= limit) {
+    rateBuckets.set(key, recent)
+    return false
+  }
+
+  recent.push(now)
+  rateBuckets.set(key, recent)
+  return true
+}
+
+const createRateLimit = ({ scope, limit, windowMs, message }) => {
+  return (req, res, next) => {
+    const key = `${scope}:${getClientIp(req)}`
+    if (!hitRateLimit({ key, limit, windowMs })) {
+      return res.status(429).json({ ok: false, message })
+    }
+    next()
+  }
+}
+
+const writeAdminAuditLog = async ({ req, action, targetType, targetId = '', before = null, after = null, metadata = {} }) => {
+  try {
+    await pool.query(
+      `insert into admin_audit_logs (
+         actor_nickname, action, target_type, target_id, before_json, after_json, metadata_json, ip_address, user_agent
+       )
+       values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9)`,
+      [
+        ADMIN_NICKNAME,
+        action,
+        targetType,
+        targetId,
+        JSON.stringify(before),
+        JSON.stringify(after),
+        JSON.stringify(metadata),
+        getClientIp(req),
+        String(req.headers['user-agent'] || ''),
+      ],
+    )
+  } catch (error) {
+    console.error('[audit] failed to write admin log:', error.message)
+  }
+}
+
 const safeIso = (value) => {
   if (!value) return new Date().toISOString()
   const d = new Date(value)
@@ -25,11 +83,77 @@ const safeIso = (value) => {
   return d.toISOString()
 }
 
+const countLinks = (text = '') => {
+  const matches = String(text || '').match(/https?:\/\//gi)
+  return matches ? matches.length : 0
+}
+
+const hasSpamLikeContent = (text = '') => {
+  const value = String(text || '')
+  if (!value.trim()) return false
+  if (countLinks(value) > 4) return true
+  if (value.length > 8000) return true
+  return false
+}
+
+const validateCommunityPayload = (payload = []) => {
+  for (const item of payload) {
+    if (hasSpamLikeContent(item?.title) || hasSpamLikeContent(item?.content)) {
+      return 'Community post looks like spam or is too large.'
+    }
+  }
+  return ''
+}
+
+const validateCommentsPayload = (payload = {}) => {
+  for (const comments of Object.values(payload)) {
+    for (const comment of comments || []) {
+      if (hasSpamLikeContent(comment?.content)) {
+        return 'Comment looks like spam or is too large.'
+      }
+      for (const reply of comment?.replies || []) {
+        if (hasSpamLikeContent(reply?.content)) {
+          return 'Reply looks like spam or is too large.'
+        }
+      }
+    }
+  }
+  return ''
+}
+
 const mentionRegex = /(^|\s)@([a-zA-Z0-9_\-.]+)/g
 
 const ADMIN_NICKNAME = 'i_luv_pen'
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || 'iluvpen-admin')
 const ADMIN_TOKEN_SECRET = String(process.env.ADMIN_TOKEN_SECRET || ADMIN_PASSWORD)
+
+const authRateLimit = createRateLimit({
+  scope: 'auth',
+  limit: Number(process.env.RATE_LIMIT_AUTH || 20),
+  windowMs: 60 * 1000,
+  message: 'Too many login/register attempts. Please try again in a minute.',
+})
+
+const communityWriteRateLimit = createRateLimit({
+  scope: 'community-write',
+  limit: Number(process.env.RATE_LIMIT_COMMUNITY_WRITE || 20),
+  windowMs: 60 * 1000,
+  message: 'Too many community updates. Please slow down and try again.',
+})
+
+const commentWriteRateLimit = createRateLimit({
+  scope: 'comment-write',
+  limit: Number(process.env.RATE_LIMIT_COMMENT_WRITE || 40),
+  windowMs: 60 * 1000,
+  message: 'Too many comment updates. Please slow down and try again.',
+})
+
+const commentLikeRateLimit = createRateLimit({
+  scope: 'comment-like',
+  limit: Number(process.env.RATE_LIMIT_COMMENT_LIKE || 120),
+  windowMs: 60 * 1000,
+  message: 'Too many like requests. Please wait a moment.',
+})
 
 const buildAdminToken = () => crypto.createHmac('sha256', ADMIN_TOKEN_SECRET).update(ADMIN_NICKNAME).digest('hex')
 
@@ -266,7 +390,7 @@ app.get('/api/db-health', async (_req, res) => {
   }
 })
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authRateLimit, async (req, res) => {
   const nickname = String(req.body?.nickname || '').trim()
   const password = String(req.body?.password || '')
   const profileImage = String(req.body?.profileImage || '').trim()
@@ -300,7 +424,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 })
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
   const nickname = String(req.body?.nickname || '').trim()
   const password = String(req.body?.password || '')
 
@@ -456,10 +580,15 @@ app.get('/api/state/community', async (_req, res) => {
   }
 })
 
-app.put('/api/state/community', async (req, res) => {
+app.put('/api/state/community', communityWriteRateLimit, async (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : req.body?.community
   if (!Array.isArray(payload)) {
     return res.status(400).json({ ok: false, message: 'Invalid community payload' })
+  }
+
+  const validationError = validateCommunityPayload(payload)
+  if (validationError) {
+    return res.status(400).json({ ok: false, message: validationError })
   }
 
   const client = await pool.connect()
@@ -521,6 +650,14 @@ app.patch('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
   }
 
   try {
+    const beforeResult = await pool.query(
+      `select id, nickname, title, content, image, likes, pinned, created_at
+       from community_posts
+       where id = $1
+       limit 1`,
+      [id],
+    )
+
     const result = await pool.query(
       `update community_posts
        set ${updates.join(', ')}
@@ -532,6 +669,15 @@ app.patch('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
     if (!result.rowCount) {
       return res.status(404).json({ ok: false, message: 'Community post not found.' })
     }
+
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.community.patch',
+      targetType: 'community_post',
+      targetId: id,
+      before: beforeResult.rows[0] || null,
+      after: result.rows[0],
+    })
 
     return res.json({ ok: true, post: result.rows[0] })
   } catch (error) {
@@ -546,10 +692,28 @@ app.delete('/api/admin/community/:id', requireAdminAuth, async (req, res) => {
   }
 
   try {
+    const beforeResult = await pool.query(
+      `select id, nickname, title, content, image, likes, pinned, created_at
+       from community_posts
+       where id = $1
+       limit 1`,
+      [id],
+    )
+
     const result = await pool.query('delete from community_posts where id = $1', [id])
     if (!result.rowCount) {
       return res.status(404).json({ ok: false, message: 'Community post not found.' })
     }
+
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.community.delete',
+      targetType: 'community_post',
+      targetId: id,
+      before: beforeResult.rows[0] || null,
+      after: null,
+    })
+
     return res.json({ ok: true, id })
   } catch (error) {
     return res.status(500).json({ ok: false, message: error.message })
@@ -605,6 +769,15 @@ app.put('/api/state/pen', requireAdminAuth, async (req, res) => {
     }
 
     await client.query('commit')
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.pen.replace_all',
+      targetType: 'pen_items',
+      targetId: 'all',
+      before: null,
+      after: { count: payload.length },
+      metadata: { ids: payload.map((item) => item.id).slice(0, 50) },
+    })
     res.json({ ok: true, count: payload.length })
   } catch (error) {
     await client.query('rollback')
@@ -657,6 +830,15 @@ app.put('/api/state/news', requireAdminAuth, async (req, res) => {
     }
 
     await client.query('commit')
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.news.replace_all',
+      targetType: 'news_posts',
+      targetId: 'all',
+      before: null,
+      after: { count: payload.length },
+      metadata: { slugs: payload.map((item) => item.slug).slice(0, 50) },
+    })
     res.json({ ok: true, count: payload.length })
   } catch (error) {
     await client.query('rollback')
@@ -692,6 +874,13 @@ app.put('/api/state/site', requireAdminAuth, async (req, res) => {
   }
 
   try {
+    const beforeResult = await pool.query(
+      `select value_json
+       from site_settings
+       where setting_key = 'site'
+       limit 1`,
+    )
+
     const normalized = normalizeSite(payload)
     await pool.query(
       `insert into site_settings (setting_key, value_json, updated_at)
@@ -700,6 +889,15 @@ app.put('/api/state/site', requireAdminAuth, async (req, res) => {
        do update set value_json = excluded.value_json, updated_at = now()`,
       [JSON.stringify(normalized)],
     )
+
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.site.upsert',
+      targetType: 'site_settings',
+      targetId: 'site',
+      before: beforeResult.rows[0]?.value_json || null,
+      after: normalized,
+    })
 
     return res.json({ ok: true, site: normalized })
   } catch (error) {
@@ -716,7 +914,7 @@ app.get('/api/state/comments-map', async (_req, res) => {
   }
 })
 
-app.patch('/api/state/comment-like', async (req, res) => {
+app.patch('/api/state/comment-like', commentLikeRateLimit, async (req, res) => {
   const commentId = String(req.body?.commentId || '').trim()
   const likes = Number(req.body?.likes)
 
@@ -742,10 +940,15 @@ app.patch('/api/state/comment-like', async (req, res) => {
   }
 })
 
-app.put('/api/state/comments-map', async (req, res) => {
+app.put('/api/state/comments-map', commentWriteRateLimit, async (req, res) => {
   const payload = req.body?.comments || req.body
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
+  }
+
+  const validationError = validateCommentsPayload(payload)
+  if (validationError) {
+    return res.status(400).json({ ok: false, message: validationError })
   }
 
   try {
@@ -762,8 +965,21 @@ app.put('/api/admin/comments-map', requireAdminAuth, async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Invalid comments payload' })
   }
 
+  const validationError = validateCommentsPayload(payload)
+  if (validationError) {
+    return res.status(400).json({ ok: false, message: validationError })
+  }
+
   try {
     await replaceCommentsMap(payload)
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.comments.replace_all',
+      targetType: 'comments',
+      targetId: 'all',
+      before: null,
+      after: { targetCount: Object.keys(payload).length },
+    })
     res.json({ ok: true })
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message })
@@ -777,13 +993,51 @@ app.delete('/api/admin/comment/:id', requireAdminAuth, async (req, res) => {
   }
 
   try {
+    const beforeResult = await pool.query(
+      `select id, target_id, nickname, content, image, likes, parent_id, created_at
+       from comments
+       where id = $1
+       limit 1`,
+      [id],
+    )
+
     const result = await pool.query('delete from comments where id = $1', [id])
     if (!result.rowCount) {
       return res.status(404).json({ ok: false, message: 'Comment not found.' })
     }
+
+    await writeAdminAuditLog({
+      req,
+      action: 'admin.comment.delete',
+      targetType: 'comment',
+      targetId: id,
+      before: beforeResult.rows[0] || null,
+      after: null,
+    })
+
     res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message })
+  }
+})
+
+app.get('/api/admin/audit-logs', requireAdminAuth, async (req, res) => {
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)))
+  const offset = Math.max(0, Number(req.query.offset || 0))
+
+  try {
+    const result = await pool.query(
+      `select id, actor_nickname, action, target_type, target_id, before_json, after_json, metadata_json, ip_address, user_agent, created_at
+       from admin_audit_logs
+       order by created_at desc
+       limit $1
+       offset $2`,
+      [limit, offset],
+    )
+
+    return res.json({ ok: true, items: result.rows, limit, offset })
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: error.message })
   }
 })
 
